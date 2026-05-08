@@ -544,7 +544,7 @@ main {
 .value-btns a:hover { color: var(--text); background: var(--bg-3); transform: translateY(-1px); }
 .value-btns a.kbb:hover     { border-color: #4DA3FF; color: #93C5FD; }
 .value-btns a.edmunds:hover { border-color: #FF6B5C; color: #FCA5A5; }
-.value-btns a.nada:hover    { border-color: #5C8FCC; color: #A5B4FC; }
+.value-btns a.trader:hover  { border-color: #FFC107; color: #FCD34D; }
 .value-btns a.carfax:hover  { border-color: #C4221C; color: #FCA5A5; }
 .view-btn {
   flex: 1;
@@ -953,21 +953,29 @@ function kbbUrl(r) {
   return `https://www.kbb.com/${make}/${model}/${year}/?${q.toString()}`;
 }
 function edmundsUrl(r) {
+  // Edmunds's appraisal tool (not the research/inventory page) — pre-fills make/model/year/zip/mileage.
   const make = _slug(r.make), model = _modelSlug(r.model), year = r.year;
   if (!make || !model || !year) return 'https://www.edmunds.com/appraisal/';
-  return `https://www.edmunds.com/${make}/${model}/${year}/?zip=${STEVE_ZIP}${r.miles?'&mileage='+r.miles:''}`;
+  const q = new URLSearchParams();
+  q.set('make', make); q.set('model', model); q.set('year', year);
+  q.set('zip', STEVE_ZIP);
+  if (r.miles) q.set('mileage', r.miles);
+  return `https://www.edmunds.com/appraisal/?${q.toString()}`;
 }
-function nadaUrl(r) {
-  const make = _cap(_slug(r.make)), model = _cap(_modelSlug(r.model)), year = r.year;
-  if (!make || !model || !year) return 'https://www.nadaguides.com/Cars';
-  return `https://www.nadaguides.com/Cars/${year}/${make}/${model}`;
+function autotraderUrl(r) {
+  // AutoTrader's used-car listings for the same year/make/model — free public market comps.
+  // Replaces NADA which has been deprecated (nadaguides.com → nada.org trade association).
+  const make = _slug(r.make), model = _modelSlug(r.model), year = r.year;
+  if (!make || !model || !year) return 'https://www.autotrader.com/sell-my-car';
+  return `https://www.autotrader.com/cars-for-sale/used-cars/${make}/${model}/${year}?searchRadius=200&zip=${STEVE_ZIP}`;
 }
 function carfaxUrl(r) {
+  // VIN-based Carfax report when we have a 17-char VIN. Otherwise send to the free
+  // government NMVTIS provider directory — Carfax blocks anonymous non-VIN deep-links.
   if (r.vin && r.vin.length === 17) {
     return `https://www.carfax.com/VehicleHistory/p/Report.cfx?vin=${encodeURIComponent(r.vin)}`;
   }
-  if (!r.make || !r.model || !r.year) return 'https://www.carfax.com/';
-  return `https://www.carfax.com/Used-${_cap(_slug(r.make))}-${_cap(_modelSlug(r.model))}_w${r.year}`;
+  return 'https://vehiclehistory.bja.ojp.gov/nmvtis_vehiclehistory';
 }
 function escapeHtml(s) {
   return (s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -1328,7 +1336,7 @@ function renderCards(visible) {
       <div class="value-btns">
         <a class="kbb"     data-value-btn="1" href="${kbbUrl(r)}"     target="_blank" rel="noopener" onclick="event.stopPropagation()" title="Look up Kelley Blue Book value">KBB</a>
         <a class="edmunds" data-value-btn="1" href="${edmundsUrl(r)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="Look up Edmunds value">Edmunds</a>
-        <a class="nada"    data-value-btn="1" href="${nadaUrl(r)}"    target="_blank" rel="noopener" onclick="event.stopPropagation()" title="Look up NADA / J.D. Power value">NADA</a>
+        <a class="trader"  data-value-btn="1" href="${autotraderUrl(r)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="See AutoTrader market listings (NADA has been deprecated)">Trader</a>
         <a class="carfax"  data-value-btn="1" href="${carfaxUrl(r)}"  target="_blank" rel="noopener" onclick="event.stopPropagation()" title="Look up Carfax history">Carfax</a>
       </div>
       <div class="actions">
