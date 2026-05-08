@@ -751,7 +751,7 @@ main {
       <label>Sort</label>
       <select id="f-sort">
         <option value="score">Best deal %</option>
-        <option value="savings">$ saved</option>
+        <option value="savings">$ potential profit</option>
         <option value="price">Price (low → high)</option>
         <option value="miles">Miles (low → high)</option>
         <option value="year">Year (new → old)</option>
@@ -1168,7 +1168,7 @@ function renderHero(visible) {
         <div class="price-row">
           <span class="price">${fmt$(top.price)}</span>
           <span class="vs">${fmt$(top.pred)}</span>
-          <span class="savings">save ${fmt$(top.savings)}</span>
+          <span class="savings">potential profit ${fmt$(top.savings)}</span>
         </div>
         <div class="meta">${fmtMiles(top.miles)} · ${top.year || ''} · ${escapeHtml(top.make || '')} ${escapeHtml(top.model || '')}</div>
       </div>
@@ -1201,7 +1201,7 @@ function renderCards(visible) {
       ? `<span class="recall ${r.recalls <= 3 ? 'few' : ''}">⚠ ${r.recalls} recall${r.recalls === 1 ? '' : 's'}</span>`
       : '';
     const savings = (r.savings != null && r.label !== 'salvage')
-      ? `<div class="savings ${r.savings < 0 ? 'neg' : ''}">${r.savings >= 0 ? 'Save ' : 'Over by '}${fmt$(Math.abs(r.savings))}</div>`
+      ? `<div class="savings ${r.savings < 0 ? 'neg' : ''}">${r.savings >= 0 ? 'Potential profit ' : 'Over by '}${fmt$(Math.abs(r.savings))}</div>`
       : '';
     const predicted = (r.pred && r.label !== 'salvage') ? `<span class="predicted">${fmt$(r.pred)}</span>` : '';
     const notes = r.notes ? `<div class="notes">${escapeHtml(r.notes)}</div>` : '';
