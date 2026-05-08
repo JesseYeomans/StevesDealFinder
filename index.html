@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Used Vehicle Deal Hunter</title>
+<style>
+:root { color-scheme: light; }
+* { box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  margin: 0; padding: 16px; background: #f5f5f7; color: #1a1a1a;
+}
+h1 { margin: 0 0 4px 0; font-size: 22px; }
+.sub { color: #666; font-size: 13px; margin-bottom: 16px; }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin-bottom: 14px; }
+.stat { background: white; border: 1px solid #e0e0e0; border-radius: 8px; padding: 10px 14px; }
+.stat .n { font-size: 20px; font-weight: 600; }
+.stat .l { font-size: 12px; color: #666; }
+.stat.great { background: #e7f6e9; border-color: #a8d5b1; }
+.stat.good { background: #f0f8e7; border-color: #c2dba2; }
+.stat.fair { background: #fff8e1; border-color: #e6cf7d; }
+.stat.over { background: #fde8eb; border-color: #e5a3ad; }
+.controls { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; align-items: center; }
+.controls button {
+  border: 1px solid #ccc; background: white; border-radius: 6px;
+  padding: 6px 10px; font-size: 13px; cursor: pointer;
+}
+.controls button.active { background: #1a73e8; color: white; border-color: #1a73e8; }
+.controls input { padding: 6px 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 13px; width: 90px; }
+.controls label { font-size: 13px; color: #444; }
+.view-toggle { margin-left: auto; }
+#count-line { font-size: 13px; color: #666; margin-bottom: 10px; }
+
+.grid {
+  display: grid; gap: 14px;
+  grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+}
+.card-deal {
+  background: white; border-radius: 10px; overflow: hidden;
+  border: 1px solid #e0e0e0;
+  display: flex; flex-direction: column;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+.card-deal:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.15); border-color: #1a73e8; }
+.card-deal { cursor: pointer; }
+.card-deal.label-great { border-color: #2d9c47; border-width: 2px; }
+.card-deal.label-overpriced { opacity: 0.7; }
+.photo-wrap {
+  position: relative; aspect-ratio: 16/10; background: #f0f0f0;
+  display: flex; align-items: center; justify-content: center;
+}
+.photo-wrap img { width: 100%; height: 100%; object-fit: cover; }
+.photo-wrap .no-photo { color: #999; font-size: 13px; }
+.score-badge {
+  position: absolute; top: 8px; right: 8px;
+  padding: 6px 14px; border-radius: 16px; font-weight: 700;
+  font-size: 15px; color: white; box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+}
+.score-great { background: #2d9c47; }
+.score-good { background: #6cb555; }
+.score-fair { background: #d4a72c; }
+.score-overpriced { background: #c4302b; }
+.score-na { background: #999; }
+.score-salvage { background: #b47b00; }
+.row-salvage td { background: #fff5e0 !important; }
+.card-deal.label-salvage { border-color: #b47b00; }
+.source-badge {
+  position: absolute; top: 8px; left: 8px;
+  padding: 3px 8px; border-radius: 12px; font-size: 11px;
+  background: rgba(0,0,0,0.6); color: white; font-weight: 600;
+}
+.body { padding: 14px 16px; flex: 1; display: flex; flex-direction: column; gap: 6px; }
+.body h3 { margin: 0; font-size: 17px; line-height: 1.3; font-weight: 600; }
+.price-row { display: flex; align-items: baseline; gap: 8px; margin-top: 4px; }
+.price { font-size: 28px; font-weight: 700; color: #1a1a1a; }
+.predicted { font-size: 12px; color: #888; text-decoration: line-through; }
+.savings { font-size: 13px; color: #2d9c47; font-weight: 600; }
+.savings.neg { color: #c4302b; }
+.specs { font-size: 13px; color: #555; line-height: 1.5; }
+.specs .dot { color: #ccc; margin: 0 4px; }
+.flags { margin-top: 4px; }
+.recall-badge {
+  display: inline-block; font-size: 11px; padding: 2px 7px; border-radius: 4px;
+  margin-right: 4px; font-weight: 600;
+}
+.recall-low { background: #fff8e1; color: #876200; }
+.recall-mid { background: #ffe5b3; color: #7a4a00; }
+.recall-high { background: #fde2e2; color: #8f1e1e; }
+.photo-notes {
+  margin-top: 6px; padding: 6px 10px; background: #eff6ff; border-left: 3px solid #1a73e8;
+  font-size: 12px; color: #234; line-height: 1.4; border-radius: 4px;
+}
+.photo-notes::before { content: "Claude saw: "; font-weight: 600; color: #1a73e8; }
+.flag {
+  display: inline-block; font-size: 11px; background: #fde2e2; color: #8f1e1e;
+  padding: 2px 7px; border-radius: 4px; margin-right: 4px;
+}
+.actions { padding: 0 14px 14px; display: flex; gap: 8px; }
+.remove-btn {
+  flex: 0 0 auto; background: transparent; border: 1px solid #d32f2f; color: #d32f2f;
+  padding: 11px 14px; border-radius: 6px; font-weight: 600; font-size: 14px;
+  cursor: pointer; transition: background 0.15s;
+}
+.remove-btn:hover { background: #ffe6e6; }
+.view-btn { flex: 1; }
+.card-deal.removed { display: none; }
+.view-btn {
+  display: block; text-align: center; text-decoration: none;
+  background: #1a73e8; color: white; padding: 11px 14px;
+  border-radius: 6px; font-weight: 600; font-size: 15px;
+  transition: background 0.15s;
+}
+.view-btn:hover { background: #1557b0; }
+.view-btn.fb { background: #1877f2; }
+.view-btn.fb:hover { background: #155cd6; }
+
+/* Table view styles */
+.table { width: 100%; background: white; border-radius: 8px; overflow: hidden; border-collapse: collapse; }
+.table th { background: #305496; color: white; padding: 10px 8px; text-align: left; font-size: 13px; cursor: pointer; user-select: none; }
+.table th:hover { background: #244175; }
+.table td { padding: 8px; font-size: 13px; border-bottom: 1px solid #eee; vertical-align: middle; }
+.table tr.label-great { background: #f0fbf2; }
+.table tr.label-good { background: #f8fcef; }
+.table tr.label-fair { background: #fffbef; }
+.table tr.label-overpriced { background: #fdf2f4; }
+.table img.thumb { width: 80px; height: 60px; object-fit: cover; border-radius: 4px; }
+.table a.title-link { color: #1a73e8; text-decoration: none; font-weight: 500; }
+.table a.title-link:hover { text-decoration: underline; }
+.hidden { display: none !important; }
+</style>
+</head>
+<body>
+<div id="gh-token-banner" style="display:none;background:#fff8e1;border:1px solid #f0c040;border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:13px;line-height:1.6">
+  🔑 <strong>Cloud sync disabled</strong> — enter your GitHub token to sync blocklist &amp; status across devices.<br>
+  <input type="password" id="gh-token-input" placeholder="paste token here…" style="margin:4px 6px 0 0;padding:5px 8px;border:1px solid #ccc;border-radius:5px;font-size:13px;width:300px">
+  <button onclick="ghSaveToken()" style="padding:5px 12px;background:#1a73e8;color:#fff;border:none;border-radius:5px;cursor:pointer;font-size:13px">Save</button>
+  <span style="color:#888;font-size:11px;margin-left:8px">Stored in your browser only. Need a token? <a href="https://github.com/settings/tokens/new?scopes=repo&description=StevesDealFinder" target="_blank" rel="noopener">Generate one here</a> (repo scope).</span>
+</div>
+
+<h1>Used Vehicle Deal Hunter</h1>
+<div class="sub" id="sub">Loading...</div>
+
+<div class="cards">
+  <div class="stat great"><div class="n" id="cnt-great">0</div><div class="l">Great deals (>15%)</div></div>
+  <div class="stat good"><div class="n" id="cnt-good">0</div><div class="l">Good (5-15%)</div></div>
+  <div class="stat fair"><div class="n" id="cnt-fair">0</div><div class="l">Fair</div></div>
+  <div class="stat over"><div class="n" id="cnt-over">0</div><div class="l">Overpriced</div></div>
+  <div class="stat" style="background:#fff5e0;border-color:#deb56b"><div class="n" id="cnt-salvage">0</div><div class="l">IAA salvage</div></div>
+  <div class="stat"><div class="n" id="cnt-flags">0</div><div class="l">Red-flagged</div></div>
+  <div class="stat"><div class="n" id="cnt-total">0</div><div class="l">Total listings</div></div>
+</div>
+
+<div class="controls">
+  <span style="font-weight:600">Filter:</span>
+  <button data-filter="all" class="active">All</button>
+  <button data-filter="great">Great only</button>
+  <button data-filter="good">Good+</button>
+  <button data-filter="ford">Fords only</button>
+  <button data-filter="cl">Craigslist</button>
+  <button data-filter="fb">Facebook</button>
+  <button data-filter="iaa">IAA salvage</button>
+  <button data-filter="noflags">Hide red flags</button>
+  <span>
+    <label>Max $</label>
+    <input type="number" id="maxPrice" placeholder="any">
+    <label>Max miles</label>
+    <input type="number" id="maxMiles" placeholder="any">
+  </span>
+  <span class="view-toggle">
+    <button data-view="cards" class="active">Cards</button>
+    <button data-view="table">Table</button>
+  </span>
+</div>
+
+<div id="count-line"></div>
+
+<div id="cards-view" class="grid"></div>
+<div id="table-view" class="hidden"></div>
+
+<script>
+const DATA = {"meta": {"run_date": "2026-05-07", "started_at_iso": "2026-05-07T13:53:05", "duration_seconds": 35.31, "counts": {"total_clean": 145, "new_since_yesterday": 145}, "labels": {"great": 59, "salvage": 37, "good": 14, "fair": 19, "insufficient-data": 16}, "xlsx_path": "/sessions/loving-tender-ride/mnt/car-finder/sedan_deals.xlsx", "xlsx_dated_path": "/sessions/loving-tender-ride/mnt/car-finder/sedan_deals_2026-05-07.xlsx"}, "listings": [{"src": "craigslist", "reg": "madison", "url": "https://chicago.craigslist.org/cto/d/alsip-2019-chevy-malibu-ls/7932591646.html", "title": "2019 Chevy Malibu LS", "price": 2200, "miles": 130000, "year": 2019, "make": "Chevrolet", "model": "Malibu", "loc": "", "photo": "https://images.craigslist.org/00t0t_2YYIDnxlso5_0t20CI_600x450.jpg", "pred": 14247, "score": 84.6, "savings": 12047, "label": "great", "flags": []}, {"src": "craigslist", "reg": "eauclaire", "url": "https://madison.craigslist.org/cto/d/richland-center-ford-focus-2016/7930743701.html", "title": "Ford Focus 2016", "price": 1900, "miles": 204000, "year": 2016, "make": "Ford", "model": "Focus", "loc": "", "photo": "https://images.craigslist.org/00g0g_aOmGxeB0Fxd_0CI0t2_600x450.jpg", "pred": 10376, "score": 81.7, "savings": 8476, "label": "great", "flags": []}, {"src": "craigslist", "reg": "madison", "url": "https://chicago.craigslist.org/cto/d/chicago-2019-ford-fiesta-se-119k/7930969997.html", "title": "2019 ford fiesta se 119k", "price": 3950, "miles": 119000, "year": 2019, "make": "Ford", "model": "fiesta", "loc": "", "photo": "https://images.craigslist.org/00x0x_5OzJaYFhVIy_0fX0CI_600x450.jpg", "pred": 20641, "score": 80.9, "savings": 16691, "label": "great", "flags": []}, {"src": "craigslist", "reg": "madison", "url": "https://indianapolis.craigslist.org/cto/d/riverdale-2015-chevy-cruze-mech-special/7930739702.html", "title": "2015 Chevy Cruze (Mech special)", "price": 2200, "miles": 151000, "year": 2015, "make": "Chevrolet", "model": "Cruze", "loc": "", "photo": "https://images.craigslist.org/00B0B_3VuiWhR1CPN_0t20CI_600x450.jpg", "pred": 7925, "score": 72.2, "savings": 5725, "label": "great", "flags": []}, {"src": "craigslist", "reg": "madison", "url": "https://chicago.craigslist.org/cto/d/riverdale-2015-chevy-cruze-mech-special/7930741163.html", "title": "2015 Chevy Cruze (Mech Special)", "price": 2200, "miles": 151000, "year": 2015, "make": "Chevrolet", "model": "Cruze", "loc": "", "photo": "https://images.craigslist.org/00707_9f5nmnJoYcm_0t20CI_600x450.jpg", "pred": 7925, "score": 72.2, "savings": 5725, "label": "great", "flags": []}, {"src": "craigslist", "reg": "stcloud", "url": "https://ames.craigslist.org/cto/d/ames-2017-ford-fiesta-19k-miles/7931439588.html", "title": "2017 Ford Fiesta 19K MILES!!", "price": 7250, "miles": 19000, "year": 2017, "make": "Ford", "model": "Fiesta", "loc": "", "photo": "https://images.craigslist.org/00B0B_h4WitYrpVEv_0x20iA_600x450.jpg", "pred": 24448, "score": 70.3, "savings": 17198, "label": "great", "flags": []}, {"src": "craigslist", "reg": "eauclaire", "url": "https://milwaukee.craigslist.org/cto/d/oconomowoc-2015-chevrolet-suv/7931967187.html", "title": "2015 Chevrolet SUV", "price": 3175, "miles": 171000, "year": 2015, "make": "Chevrolet", "model": "SUV", "loc": "", "photo": "https://images.craigslist.org/00t0t_f2bD3XrD2Qe_0CI0t2_600x450.jpg", "pred": 10295, "score": 69.2, "savings": 7120, "label": "great", "flags": []}, {"src": "craigslist", "reg": "wausau", "url": "https://milwaukee.craigslist.org/cto/d/franksville-2015-ford-f250/7926914444.html", "title": "2015 Ford F250", "price": 5000, "miles": 339104, "year": 2015, "make": "Ford", "model": "F250", "loc": "", "photo": "https://images.craigslist.org/00H0H_gLVXa9AI0q5_0t20CI_600x450.jpg", "pred": 15500, "score": 67.7, "savings": 10500, "label": "great", "flags": []}, {"src": "craigslist", "reg": "madison", "url": "https://chicago.craigslist.org/cto/d/orland-park-2017-ford-taurus-police/7929506769.html", "title": "2017 Ford Taurus Police Interceptor", "price": 3900, "miles": 170000, "year": 2017, "make": "Ford", "model": "Taurus", "loc": "", "photo": "https://images.craigslist.org/00505_f2XS9AJdL6G_0CI0t2_600x450.jpg", "pred": 11930, "score": 67.3, "savings": 8030, "label": "great", "flags": []}, {"src": "craigslist", "reg": "madison", "url": "https://chicago.craigslist.org/cto/d/oak-lawn-2016-kia-optima-runs-great/7928976311.html", "title": "2016 KIA OPTIMA  . .. RUNS GREAT . .. LOADED .. CLEAN", "price": 4900, "miles": 120000, "year": 2016, "make": "Kia", "model": "OPTIMA", "loc": "", "photo": "https://images.craigslist.org/00m0m_aDaHsR1wVzv_0CI0t2_600x450.jpg", "pred": 14345, "score": 65.8, "savings": 9445, "label": "great", "flags": []}, {"src": "craigslist", "reg": "duluth", "url": "https://minneapolis.craigslist.org/cto/d/stacy-2018-ford-x4/7932300435.html", "title": "2018 Ford F-150 - 4x4", "price": 9500, "miles": 183000, "year": 2018, "make": "Ford", "model": "F-150", "loc": "", "photo": "https://images.craigslist.org/01717_ecH3mm3yvYs_0CI0t2_600x450.jpg", "pred": 26000, "score": 63.5, "savings": 16500, "label": "great", "flags": []}, {"src": "craigslist", "reg": "eauclaire", "url": "https://milwaukee.craigslist.org/cto/d/milwaukee-2018-ford-explorer/7931052829.html", "title": "2018 Ford Explorer", "price": 5995, "miles": 200000, "year": 2018, "make": "Ford", "model": "Explorer", "loc": "", "photo": "https://images.craigslist.org/00n0n_8QY0R9hzmc1_0CI0t2_600x450.jpg", "pred": 15650, "score": 61.7, "savings": 9655, "label": "great", "flags": []}, {"src": "craigslist", "reg": "duluth", "url": "https://rmn.craigslist.org/cto/d/blooming-prairie-2021-ford-taurus/7928224079.html", "title": "2021 FORD TAURUS POLICE INTERCETOR", "price": 15000, "miles": 77000, "year": 2021, "make": "Ford", "model": "TAURUS", "loc": "", "photo": "https://images.craigslist.org/00606_j3wslbOjkCg_0CI0t2_600x450.jpg", "pred": 38118, "score": 60.6, "savings": 23118, "label": "great", "flags": []}, {"src": "craigslist", "reg": "madison", "url": "https://chicago.craigslist.org/cto/d/brookfield-ford/7932223060.html", "title": "Ford F150 2021", "price": 15900, "miles": 70000, "year": 2021, "make": "Ford", "model": "F150", "loc": "", "photo": "https://images.craigslist.org/01414_1iZBGVVpP05_0CI0t2_600x450.jpg", "pred": 39909, "score": 60.2, "savings": 24009, "label": "great", "flags": []}, {"src": "craigslist", "reg": "madison", "url": "https://chicago.craigslist.org/cto/d/calumet-city-2017-chevy-traverse-lt-awd/7931696717.html", "title": "2017 chevy traverse LT awd", "price": 4500, "miles": 163031, "year": 2017, "make": "Chevrolet", "model": "traverse", "loc": "", "photo": "https://images.craigslist.org/00M0M_9quQRo3LDFU_0t20t2_600x450.jpg", "pred": 10319, "score": 56.4, "savings": 5819, "label": "great", "flags": []}, {"src": "craigslist", "reg": "wausau", "url": "https://chicago.craigslist.org/cto/d/harwood-heights-toyota-corolla-le-2021/7928691932.html", "title": "Toyota Corolla LE 2021", "price": 14490, "miles": 67000, "year": 2021, "make": "Toyota", "model": "Corolla", "loc": "", "photo": "https://images.craigslist.org/01616_6xjUp6Gs73g_0hq0n8_600x450.jpg", "pred": 30691, "score": 52.8, "savings": 16201, "label": "great", "flags": []}, {"src": "iaa", "reg": "iaa-east", "url": "https://www.iaai.com/VehicleDetail/45379809~US", "title": "2015 Ford F-250 XL", "price": 4800, "miles": 198297, "year": 2015, "make": "Ford", "model": "F-250", "loc": "East", "photo": "https://vis.iaai.com/resizer?imageKeys=45379809~SID~I1&width=400&height=300", "pred": 9600, "score": 50.0, "savings": 4800, "label": "salvage", "flags": []}, {"src": "iaa", "reg": "iaa-west", "url": "https://www.iaai.com/VehicleDetail/45377316~US", "title": "2022 Hyundai TUCSON SEL", "price": 9537, "miles": 45148, "year": 2022, "make": "Hyundai", "model": "TUCSON", "loc": "West", "photo": "https://vis.iaai.com/resizer?imageKeys=45377316~SID~I1&width=400&height=300", "pred": 19075, "score": 50.0, "savings": 9538, "label": "salvage", "flags": []}, {"src": "iaa", "reg": "iaa-west", "url": "https://www.iaai.com/VehicleDetail/45374178~US", "title": "2020 Toyota RAV4 XLE", "price": 7750, "miles": 154925, "year": 2020, "make": "Toyota", "model": "RAV4", "loc": "West", "photo": "https://vis.iaai.com/resizer?imageKeys=45374178~SID~I1&width=400&height=300", "pred": 15500, "score": 50.0, "savings": 7750, "label": "salvage", "flags": []}, {"src": "iaa", "reg": "iaa-west", "url": "https://www.iaai.com/VehicleDetail/45372319~US", "title": "2017 Gmc SIERRA 1500 SLT", "price": 8900, "miles": 101762, "year": 2017, "make": "Gmc", "model": "SIERRA 1500", "loc": "West", "photo": "https://vis.iaai.com/resizer?imageKeys=45372319~SID~I1&width=400&height=300", "pred": 17800, "score": 50.0, "savings": 8900, "label": "salvage", "flags": []}, {"src": "iaa", "reg": "iaa-west", "url": "https://www.iaai.com/VehicleDetail/45368233~US", "title": "2016 Chevrolet SILVERADO 1500 1LT", "price": 875, "miles": 171420, "year": 2016, "make": "Chevrolet", "model": "SILVERADO 1500", "loc": "West", "photo": "https://vis.iaai.com/resizer?imageKeys=45368233~SID~I1&width=400&height=300", "pred": 1750, "score": 50.0, "savings": 875, "label": "salvage", "flags": []}, {"src": "iaa", "reg": "iaa-west", "url": "https://www.iaai.com/VehicleDetail/45351230~US", "title": "2017 Ford F-350 KING RANCH", "price": 1375, "miles": 202588, "year": 2017, "make": "Ford", "model": "F-350", "loc": "West", "photo": "https://vis.iaai.com/resizer?imageKeys=45351230~SID~I1&width=400&height=300", "pred": 2750, "score": 50.0, "savings": 1375, "label": "salvage", "flags": []}, {"src": "iaa", "reg": "iaa-west", "url": "https://www.iaai.com/VehicleDetail/45134110~US", "title": "2015 Nissan TITAN SL", "price": 425, "miles": 258889, "year": 2015, "make": "Nissan", "model": "TITAN", "loc": "West", "photo": "https://vis.iaai.com/resizer?imageKeys=45134110~SID~I1&width=400&height=300", "pred": 850, "score": 50.0, "savings": 425, "label": "salvage", "flags": []}, {"src": "iaa", "reg": "iaa-east", "url": "https://www.iaai.com/VehicleDetail/45334330~US", "title": "2016 Nissan VERSA NOTE SV", "price": 1200, "miles": 88767, "year": 2016, "make": "Nissan", "model": "VERSA NOTE", "loc": "East", "photo": "https://vis.iaai.com/resizer?imageKeys=45334330~SID~I1&width=400&height=300", "pred": 2400, "score": 50.0, "savings": 1200, "label": "salvage", "flags": []}, {"src": "iaa", "reg": "iaa-west", "url": "https://www.iaai.com/VehicleDetail/45444424~US", "title": "2018 Ford FUSION HYBRID S", "price": 250, "miles": 28673, "year": 2018, "make": "Ford", "model": "FUSION HYBRID", "loc": "West", "photo": "https://vis.iaai.com/resizer?imageKeys=45444424~SID~I1&width=400&height=300", "pred": 500, "score": 50.0, "savings": 250, "label": "salvage", "flags": []}, {"src": "iaa", "reg": "iaa-us", "url": "https://www.iaai.com/VehicleDetail/45362796~US", "title": "2020 Ford F-150 XL", "price": 3200, "miles": 102361, "year": 2020, "make": "Ford", "model": "F-150", "loc": "", "photo": "https://vis.iaai.com/resizer?imageKeys=45362796~SID~I1&width=400&height=300", "pred": 6400, "score": 50.0, "savings": 3200, "label": "salvage", "flags": []}, {"src": "iaa", "reg": "iaa-east", "url": "https://www.iaai.com/VehicleDetail/45554752~US", "title": "2019 Kia SORENTO 3.3L EX", "price": 650, "miles": 123167, "year": 2019, "make": "Kia", "model": "SORENTO", "loc": "East", "photo": "https://vis.iaai.com/resizer?imageKeys=45554752~SID~I1&width=400&height=300", "pred": 1300, "score": 50.0, "savings": 650, "label": "salvage", "flags": []}, {"src": "iaa", "reg": "iaa-east", "url": "https://www.iaai.com/VehicleDetail/45552696~US", "title": "2019 Nissan ROGUE SPORT S", "price": 1150, "miles": 98596, "year": 2019, "make": "Nissan", "model": "ROGUE SPORT", "loc": "East", "photo": "https://vis.iaai.com/resizer?imageKeys=45552696~SID~I1&width=400&height=300", "pred": 2300, "score": 50.0, "savings": 1150, "label": "salvage", "flags": []}, {"src": "iaa", "reg": "iaa-east", "url": "https://www.iaai.com/VehicleDetail/45549600~US", "title": "2015 Nissan SENTRA SV", "price": 1145, "miles": 99153, "year": 2015, "make": "Nissan", "model": "SENTRA", "loc": "East", "photo": "https://vis.iaai.com/resizer?imageKeys=45549600~SID~I1&width=400&height=300", "pred": 2290, "score": 50.0, "savings": 1145, "label": "salvage", "flags": []}, {"src": "iaa", "reg": "iaa-east", "url": "https://www.iaai.com/VehicleDetail/45547881~US", "title": "2017 Chevrolet SONIC LT AUTO", "price": 3400, "miles": 49913, "year": 2017, "make": "Chevrolet", "model": "SONIC", "loc": "East", "photo": "https://vis.iaai.com/resizer?imageKeys=45547881~SID~I1&width=400&height=300", "pred": 6800, "score": 50.0, "savings": 3400, "label": "salvage", "flags": []}, {"src": "iaa", "reg": "iaa-east", "url": "https://www.iaai.com/VehicleDetail/45545019~US", "title": "2017 Jaguar F-PACE 20D PRESTIGE", "price": 1237, "miles": 103505, "year": 2017, "make": "Jaguar", "model": "F-PACE", "loc": "East", "photo": "https://vis.iaai.com/resizer?imageKeys=45545019~SID~I1&width=400&height=300", "pred": 2475, "score": 50.0, "savings": 1238, "label": "salvage", "flags": []}, {"src": "iaa", "reg": "iaa-east", "url": "https://www.iaai.com/VehicleDetail/45544615~US", "title": "2017 Nissan SENTRA S", "price": 2700, "miles": 53669, "year": 2017, "make": "Nissan", "model": "SENTRA", "loc": "East", "photo": "https://vis.iaai.com/resizer?imageKeys=45544615~SID~I1&width=400&height=300", "pred": 5400, "score": 50.0, "savings": 2700, "label": "salvage", "flags": []}, {"src": "iaa", "reg": "iaa-east", "url": "https://www.iaai.com/VehicleDetail/45543307~US", "title": "2016 Nissan ALTIMA 2.5 S", "price": 300, "miles": 199113, "year": 2016, "make": "Nissan", "model": "ALTIMA", "loc": "East", "photo": "https://vis.iaai.com/resizer?imageKeys=45543307~SID~I1&width=400&height=300", "pred": 600, "score": 50.0, "savings": 300, "label": "salvage", "flags": []}, {"src": "iaa", "reg": "iaa-east", "url": "https://www.iaai.com/VehicleDetail/45543280~US", "title": "2016 Nissan ROGUE S", "price": 3570, "miles": 190938, "year": 2016, "make": "Nissan", "model": "ROGUE", "loc": "East", "photo": "https://vis.iaai.com/resizer?imageKeys=45543280~SID~I1&width=400&height=300", "pred": 7140, "score": 50.0, "savings": 3570, "label": "salvage", "flags": []}, {"src": "iaa", "reg": "iaa-east", "url": "https://www.iaai.com/VehicleDetail/45542683~US", "title": "2016 Mazda CX-5 GRAND TOURING", "price": 875, "miles": 142066, "year": 2016, "make": "Mazda", "model": "CX-5", "loc": "East", "photo": "https://vis.iaai.com/resizer?imageKeys=45542683~SID~I1&width=400&height=300", "pred": 1750, "score": 50.0, "savings": 875, "label": "salvage", "flags": []}, {"src": "iaa", "reg": "iaa-east", "url": "https://www.iaai.com/VehicleDetail/45540918~US", "title": "2015 Nissan PATHFINDER S", "price": 1762, "miles": 202789, "year": 2015, "make": "Nissan", "model": "PATHFINDER", "loc": "East", "photo": "https://vis.iaai.com/resizer?imageKeys=45540918~SID~I1&width=400&height=300", "pred": 3525, "score": 50.0, "savings": 1763, "label": "salvage", "flags": []}, {"src": "iaa", "reg": "iaa-east", "url": "https://www.iaai.com/VehicleDetail/45540396~US", "title": "2017 Buick ENCLAVE LEATHER", "price": 300, "miles": 143253, "year": 2017, "make": "Buick", "model": "ENCLAVE", "loc": "East", "photo": "https://vis.iaai.com/resizer?imageKeys=45540396~SID~I1&width=400&height=300", "pred": 600, "score": 50.0, "savings": 300, "label": "salvage", "flags": []}, {"src": "iaa", "reg": "iaa-east", "url": "https://www.iaai.com/VehicleDetail/45539625~US", "title": "2019 Chevrolet TRAX LT", "price": 3750, "miles": 115730, "year": 2019, "make": "Chevrolet", "model": "TRAX", "loc": "East", "photo": "https://vis.iaai.com/resizer?imageKeys=45539625~SID~I1&width=400&height=300", "pred": 7500, "score": 50.0, "savings": 3750, "label": "salvage", "flags": []}, {"src": "iaa", "reg": "iaa-east", "url": "https://www.iaai.com/VehicleDetail/45539172~US", "title": "2017 Hyundai ELANTRA SE", "price": 962, "miles": 162439, "year": 2017, "make": "Hyundai", "model": "ELANTRA", "loc": "East", "photo": "https://vis.iaai.com/resizer?imageKeys=45539172~SID~I1&width=400&height=300", "pred": 1925, "score": 50.0, "savings": 963, "label": "salvage", "flags": []}, {"src": "iaa", "reg": "iaa-east", "url": "https://www.iaai.com/VehicleDetail/45539109~US", "title": "2015 Hyundai SONATA SE", "price": 1650, "miles": 156652, "year": 2015, "make": "Hyundai", "model": "SONATA", "loc": "East", "photo": "https://vis.iaai.com/resizer?imageKeys=45539109~SID~I1&width=400&height=300", "pred": 3300, "score": 50.0, "savings": 1650, "label": "salvage", "flags": []}, {"src": "iaa", "reg": "iaa-east", "url": "https://www.iaai.com/VehicleDetail/45539082~US", "title": "2019 Hyundai ELANTRA SEL", "price": 2950, "miles": 151926, "year": 2019, "make": "Hyundai", "model": "ELANTRA", "loc": "East", "photo": "https://vis.iaai.com/resizer?imageKeys=45539082~SID~I1&width=400&height=300", "pred": 5900, "score": 50.0, "savings": 2950, "label": "salvage", "flags": []}, {"src": "iaa", "reg": "iaa-east", "url": "https://www.iaai.com/VehicleDetail/45538761~US", "title": "2019 Ford F-150 XL", "price": 1800, "miles": 77247, "year": 2019, "make": "Ford", "model": "F-150", "loc": "East", "photo": "https://vis.iaai.com/resizer?imageKeys=45538761~SID~I1&width=400&height=300", "pred": 3600, "score": 50.0, "savings": 1800, "label": "salvage", "flags": []}, {"src": "iaa", "reg": "iaa-east", "url": "https://www.iaai.com/VehicleDetail/45538687~US", "title": "2016 Ford UTILITY POLICE INTERCEPTOR", "price": 10850, "miles": 121277, "year": 2016, "make": "Ford", "model": "UTILITY POLICE INTERCEPTOR", "loc": "East", "photo": "https://vis.iaai.com/resizer?imageKeys=45538687~SID~I1&width=400&height=300", "pred": 21700, "score": 50.0, "savings": 10850, "label": "salvage", "flags": []}, {"src": "iaa", "reg": "iaa-east", "url": "https://www.iaai.com/VehicleDetail/45538541~US", "title": "2016 Audi A5 2.0T PREMIUM", "price": 2100, "miles": 138339, "year": 2016, "make": "Audi", "model": "A5", "loc": "East", "photo": "https://vis.iaai.com/resizer?imageKeys=45538541~SID~I1&width=400&height=300", "pred": 4200, "score": 50.0, "savings": 2100, "label": "salvage", "flags": []}, {"src": "iaa", "reg": "iaa-east", "url": "https://www.iaai.com/VehicleDetail/45538286~US", "title": "2019 Hyundai ELANTRA SEL", "price": 8725, "miles": 72725, "year": 2019, "make": "Hyundai", "model": "ELANTRA", "loc": "East", "photo": "https://vis.iaai.com/resizer?imageKeys=45538286~SID~I1&width=400&height=300", "pred": 17450, "score": 50.0, "savings": 8725, "label": "salvage", "flags": []}, {"src": "iaa", "reg": "iaa-east", "url": "https://www.iaai.com/VehicleDetail/45538244~US", "title": "2022 Jeep RENEGADE LATITUDE 4X4", "price": 3375, "miles": 53690, "year": 2022, "make": "Jeep", "model": "RENEGADE", "loc": "East", "photo": "https://vis.iaai.com/resizer?imageKeys=45538244~SID~I1&width=400&height=300", "pred": 6750, "score": 50.0, "savings": 3375, "label": "salvage", "flags": []}, {"src": "iaa", "reg": "iaa-east", "url": "https://www.iaai.com/VehicleDetail/45537748~US", "title": "2015 Chrysler TOWN &amp; COUNTRY TOURING", "price": 1857, "miles": 111635, "year": 2015, "make": "Chrysler", "model": "TOWN &amp; COUNTRY", "loc": "East", "photo": "https://vis.iaai.com/resizer?imageKeys=45537748~SID~I1&width=400&height=300", "pred": 3715, "score": 50.0, "savings": 1858, "label": "salvage", "flags": []}, {"src": "iaa", "reg": "iaa-east", "url": "https://www.iaai.com/VehicleDetail/45536595~US", "title": "2019 Honda HR-V SPORT", "price": 3575, "miles": 66330, "year": 2019, "make": "Honda", "model": "HR-V", "loc": "East", "photo": "https://vis.iaai.com/resizer?imageKeys=45536595~SID~I1&width=400&height=300", "pred": 7150, "score": 50.0, "savings": 3575, "label": "salvage", "flags": []}, {"src": "craigslist", "reg": "wausau", "url": "https://muskegon.craigslist.org/cto/d/twin-lake-2015-toyota-corolla/7929282094.html", "title": "2015 Toyota Corolla", "price": 7200, "miles": 166857, "year": 2015, "make": "Toyota", "model": "Corolla", "loc": "", "photo": "https://images.craigslist.org/00k0k_awViTEdqOx6_0t20CI_600x450.jpg", "pred": 14276, "score": 49.6, "savings": 7076, "label": "great", "flags": []}, {"src": "craigslist", "reg": "duluth", "url": "https://minneapolis.craigslist.org/cto/d/princeton-2017-nissan-altima-25-sv/7930485477.html", "title": "2017 Nissan Altima 2.5 SV", "price": 8700, "miles": 92016, "year": 2017, "make": "Nissan", "model": "Altima", "loc": "", "photo": "https://images.craigslist.org/00V0V_3L9Ru2A0U0E_0x20ss_600x450.jpg", "pred": 16968, "score": 48.7, "savings": 8268, "label": "great", "flags": []}, {"src": "craigslist", "reg": "duluth", "url": "https://eauclaire.craigslist.org/cto/d/eau-claire-2015-toyota-rav4-xle-awd/7932425182.html", "title": "2015 Toyota Rav4 XLE AWD", "price": 7800, "miles": 237750, "year": 2015, "make": "Toyota", "model": "Rav4", "loc": "", "photo": "https://images.craigslist.org/01212_60QuOrFgoGC_07K0ak_600x450.jpg", "pred": 15000, "score": 48.0, "savings": 7200, "label": "great", "flags": []}, {"src": "craigslist", "reg": "madison", "url": "https://chicago.craigslist.org/cto/d/elmwood-park-2015-ford-escape/7927499814.html", "title": "2015 Ford Escape", "price": 4500, "miles": 117000, "year": 2015, "make": "Ford", "model": "Escape", "loc": "", "photo": "https://images.craigslist.org/00t0t_bWzFoQyx1ju_0t20CI_600x450.jpg", "pred": 8383, "score": 46.3, "savings": 3883, "label": "great", "flags": []}, {"src": "craigslist", "reg": "madison", "url": "https://chicago.craigslist.org/cto/d/forest-park-2015-ford-explorer-xlt-4wd/7931271038.html", "title": "2015 Ford Explorer XLT 4WD", "price": 6750, "miles": 123000, "year": 2015, "make": "Ford", "model": "Explorer", "loc": "", "photo": "https://images.craigslist.org/00t0t_4wHM7w2HpMb_0CI0t2_600x450.jpg", "pred": 12545, "score": 46.2, "savings": 5795, "label": "great", "flags": []}, {"src": "craigslist", "reg": "duluth", "url": "https://minneapolis.craigslist.org/cto/d/minneapolis-2018-ford-explorer-awd/7932203995.html", "title": "2018 Ford Explorer AWD Police Interceptor", "price": 8500, "miles": 137290, "year": 2018, "make": "Ford", "model": "Explorer", "loc": "", "photo": "https://images.craigslist.org/00Z0Z_kxwtqWLXiYK_0CI0t2_600x450.jpg", "pred": 15650, "score": 45.7, "savings": 7150, "label": "great", "flags": []}, {"src": "craigslist", "reg": "duluth", "url": "https://eauclaire.craigslist.org/cto/d/chippewa-falls-2020-ford-fusion/7930224573.html", "title": "2020 Ford Fusion S", "price": 14900, "miles": 98950, "year": 2020, "make": "Ford", "model": "Fusion", "loc": "", "photo": "https://images.craigslist.org/00h0h_jUjtM35TsF2_0hL05S_600x450.jpg", "pred": 27397, "score": 45.6, "savings": 12497, "label": "great", "flags": []}, {"src": "craigslist", "reg": "duluth", "url": "https://duluth.craigslist.org/cto/d/duluth-2017-malibu-lt-good-mechanically/7930166607.html", "title": "2017 Malibu LT - Good mechanically, 40mpg, clean interior", "price": 8900, "miles": 101000, "year": 2017, "make": "", "model": "", "loc": "", "photo": "https://images.craigslist.org/00404_ktvHzQd9jRd_0CI0t2_600x450.jpg", "pred": 16367, "score": 45.6, "savings": 7467, "label": "great", "flags": []}, {"src": "craigslist", "reg": "duluth", "url": "https://northernwi.craigslist.org/cto/d/long-lake-2017-equinox-premier/7932599503.html", "title": "2017 EQUINOX PREMIER", "price": 9500, "miles": 88000, "year": 2017, "make": "", "model": "", "loc": "", "photo": "https://images.craigslist.org/00A0A_j2EbmP5UX0W_0CI0t2_600x450.jpg", "pred": 17227, "score": 44.9, "savings": 7727, "label": "great", "flags": []}, {"src": "craigslist", "reg": "minneapolis", "url": "https://madison.craigslist.org/cto/d/verona-2017-toyota-sienna-limited-clean/7932171046.html", "title": "2017 Toyota Sienna Limited - Clean Title, Loaded - $15,900", "price": 15900, "miles": 149781, "year": 2017, "make": "Toyota", "model": "Sienna", "loc": "", "photo": "https://images.craigslist.org/00606_gJsLdImdnay_1u8176_600x450.jpg", "pred": 27900, "score": 43.0, "savings": 12000, "label": "great", "flags": []}, {"src": "craigslist", "reg": "duluth", "url": "https://minneapolis.craigslist.org/cto/d/lakeville-2021-toyota-corolla-le/7931939585.html", "title": "2021 Toyota Corolla LE", "price": 18500, "miles": 52000, "year": 2021, "make": "Toyota", "model": "Corolla", "loc": "", "photo": "https://images.craigslist.org/00808_lMEpn3I3nMG_0CI0t2_600x450.jpg", "pred": 31679, "score": 41.6, "savings": 13179, "label": "great", "flags": []}, {"src": "craigslist", "reg": "duluth", "url": "https://wausau.craigslist.org/cto/d/arpin-2019-toyota-camry-le/7930954956.html", "title": "2019 Toyota Camry LE", "price": 18500, "miles": 45000, "year": 2019, "make": "Toyota", "model": "Camry", "loc": "", "photo": "https://images.craigslist.org/00x0x_b5a7JFEhIZQ_0CI0t2_600x450.jpg", "pred": 31541, "score": 41.3, "savings": 13041, "label": "great", "flags": []}, {"src": "craigslist", "reg": "duluth", "url": "https://duluth.craigslist.org/cto/d/duluth-2015-chevy-silverado/7929642279.html", "title": "2015 Chevy Silverado", "price": 12500, "miles": 144800, "year": 2015, "make": "Chevrolet", "model": "Silverado", "loc": "", "photo": "https://images.craigslist.org/00000_eLAGqW9H8kD_0lM0t2_600x450.jpg", "pred": 21252, "score": 41.2, "savings": 8752, "label": "great", "flags": []}, {"src": "craigslist", "reg": "lacrosse", "url": "https://desmoines.craigslist.org/cto/d/des-moines-2015-chevy-impala/7926684807.html", "title": "2015 Chevy Impala", "price": 6200, "miles": 160000, "year": 2015, "make": "Chevrolet", "model": "Impala", "loc": "", "photo": "https://images.craigslist.org/00k0k_b37yAiIwJxG_0t20CI_600x450.jpg", "pred": 10369, "score": 40.2, "savings": 4169, "label": "great", "flags": []}, {"src": "craigslist", "reg": "duluth", "url": "https://minneapolis.craigslist.org/cto/d/cottage-grove-2016-ford-150-supercrew/7927592966.html", "title": "2016 Ford F-150 supercrew cab", "price": 15000, "miles": 60790, "year": 2016, "make": "Ford", "model": "F-150", "loc": "", "photo": "https://images.craigslist.org/00e0e_5BPDKfUCABI_0CI0t2_600x450.jpg", "pred": 25000, "score": 40.0, "savings": 10000, "label": "great", "flags": []}, {"src": "craigslist", "reg": "duluth", "url": "https://eauclaire.craigslist.org/cto/d/eau-claire-2016-ford-fusion-6995-obo/7927122516.html", "title": "2016 Ford Fusion $6995 OBO", "price": 6995, "miles": 176000, "year": 2016, "make": "Ford", "model": "Fusion", "loc": "", "photo": "https://images.craigslist.org/00L0L_2T5rHifCdx8_0t20CI_600x450.jpg", "pred": 11383, "score": 38.5, "savings": 4388, "label": "great", "flags": []}, {"src": "craigslist", "reg": "duluth", "url": "https://minneapolis.craigslist.org/cto/d/saint-paul-2015-chevy-traverse-ltz-all/7932388472.html", "title": "2015 Chevy traverse LTZ all wheel drive", "price": 6800, "miles": 130000, "year": 2015, "make": "Chevrolet", "model": "traverse", "loc": "", "photo": "https://images.craigslist.org/00M0M_cgGe9IYfIL6_13O0Ny_600x450.jpg", "pred": 10862, "score": 37.4, "savings": 4062, "label": "great", "flags": []}, {"src": "craigslist", "reg": "eauclaire", "url": "https://madison.craigslist.org/cto/d/middleton-2015-chevy-impala-ls/7930973516.html", "title": "2015 Chevy Impala LS", "price": 6000, "miles": 224000, "year": 2015, "make": "Chevrolet", "model": "Impala", "loc": "", "photo": "https://images.craigslist.org/00y0y_4Vq8lsXf3dx_0t20CI_600x450.jpg", "pred": 9510, "score": 36.9, "savings": 3510, "label": "great", "flags": []}, {"src": "craigslist", "reg": "duluth", "url": "https://minneapolis.craigslist.org/cto/d/princeton-2015-nissan-rogue-sv-awd/7930482669.html", "title": "2015 Nissan Rogue SV AWD", "price": 8950, "miles": 101364, "year": 2015, "make": "Nissan", "model": "Rogue", "loc": "", "photo": "https://images.craigslist.org/00r0r_cPGyQ5R21E4_0vL0t2_600x450.jpg", "pred": 13802, "score": 35.2, "savings": 4852, "label": "great", "flags": []}, {"src": "craigslist", "reg": "wausau", "url": "https://chicago.craigslist.org/cto/d/mount-prospect-2015-toyota-corolla-le/7931095920.html", "title": "2015 TOYOTA COROLLA LE", "price": 12500, "miles": 114000, "year": 2015, "make": "Toyota", "model": "COROLLA", "loc": "", "photo": "https://images.craigslist.org/00Y0Y_hRI6Nn4cSlh_0CI0t2_600x450.jpg", "pred": 18904, "score": 33.9, "savings": 6404, "label": "great", "flags": []}, {"src": "craigslist", "reg": "lacrosse", "url": "https://lacrosse.craigslist.org/cto/d/black-river-falls-2022-chevrolet/7927977311.html", "title": "2022 Chevrolet Trailblazer LT", "price": 18900, "miles": 49000, "year": 2022, "make": "Chevrolet", "model": "Trailblazer", "loc": "", "photo": "https://images.craigslist.org/00n0n_d9v733jJZcC_0zQ0t2_600x450.jpg", "pred": 28500, "score": 33.7, "savings": 9600, "label": "great", "flags": []}, {"src": "craigslist", "reg": "madison", "url": "https://chicago.craigslist.org/cto/d/chicago-2019-chevy-equinox-lt/7926930532.html", "title": "2019 Chevy equinox LT", "price": 4950, "miles": 180000, "year": 2019, "make": "Chevrolet", "model": "equinox", "loc": "", "photo": "https://images.craigslist.org/00j0j_5etVt2qXKWM_0t20CI_600x450.jpg", "pred": 7470, "score": 33.7, "savings": 2520, "label": "great", "flags": []}, {"src": "craigslist", "reg": "duluth", "url": "https://minneapolis.craigslist.org/cto/d/buffalo-2017-ford-taurus-awd-112k/7929205446.html", "title": "2017 Ford Taurus AWD 112K", "price": 10750, "miles": 112106, "year": 2017, "make": "Ford", "model": "Taurus", "loc": "", "photo": "https://images.craigslist.org/00G0G_amxTnksJH5e_0CI0t2_600x450.jpg", "pred": 16118, "score": 33.3, "savings": 5368, "label": "great", "flags": []}, {"src": "craigslist", "reg": "eauclaire", "url": "https://milwaukee.craigslist.org/cto/d/milwaukee-2020-and-2019-ford-f150-4x4/7931718440.html", "title": "2020 and 2019 Ford F150 4x4", "price": 10000, "miles": 200000, "year": 2020, "make": "Ford", "model": "F150", "loc": "", "photo": "https://images.craigslist.org/00505_e34bE3fGCaV_0CI0t2_600x450.jpg", "pred": 15000, "score": 33.3, "savings": 5000, "label": "great", "flags": []}, {"src": "craigslist", "reg": "madison", "url": "https://chicago.craigslist.org/cto/d/chicago-2016-ford-edge-titanium/7930204467.html", "title": "2016 Ford Edge Titanium", "price": 10500, "miles": 92000, "year": 2016, "make": "Ford", "model": "Edge", "loc": "", "photo": "https://images.craigslist.org/00k0k_5ShrVMbHML6_0CI0sU_600x450.jpg", "pred": 15241, "score": 31.1, "savings": 4741, "label": "great", "flags": []}, {"src": "craigslist", "reg": "duluth", "url": "https://minneapolis.craigslist.org/cto/d/minneapolis-2016-chevy-silverado-1500-lt/7930016498.html", "title": "2016 Chevy Silverado 1500 Lt", "price": 10000, "miles": 182000, "year": 2016, "make": "Chevrolet", "model": "Silverado", "loc": "", "photo": "https://images.craigslist.org/01111_e3hnYx097Sh_1u80PP_600x450.jpg", "pred": 14450, "score": 30.8, "savings": 4450, "label": "great", "flags": []}, {"src": "craigslist", "reg": "madison", "url": "https://chicago.craigslist.org/cto/d/willowbrook-2017-ford-fusion/7932100063.html", "title": "2017 FORD FUSION", "price": 6500, "miles": 205000, "year": 2017, "make": "Ford", "model": "FUSION", "loc": "", "photo": "https://images.craigslist.org/00O0O_5yaO3Ek1hR7_05a03S_600x450.jpg", "pred": 9246, "score": 29.7, "savings": 2746, "label": "great", "flags": []}, {"src": "craigslist", "reg": "duluth", "url": "https://minneapolis.craigslist.org/cto/d/minneapolis-2016-toyota-camry-xse/7932628473.html", "title": "2016 Toyota Camry XSE (WARRANTY) - PLATINUM CERTIFIED", "price": 16999, "miles": 97500, "year": 2016, "make": "Toyota", "model": "Camry", "loc": "", "photo": "https://images.craigslist.org/00303_kLUfK2OyFMS_0CI0pO_600x450.jpg", "pred": 24010, "score": 29.2, "savings": 7011, "label": "great", "flags": []}, {"src": "craigslist", "reg": "eauclaire", "url": "https://madison.craigslist.org/cto/d/portage-2025-chevy-colorado-wt/7930467415.html", "title": "2025 Chevy Colorado WT", "price": 28000, "miles": 20500, "year": 2025, "make": "Chevrolet", "model": "Colorado", "loc": "", "photo": "https://images.craigslist.org/00202_jZ9oJPcLZtz_0t20CI_600x450.jpg", "pred": 38983, "score": 28.2, "savings": 10983, "label": "great", "flags": []}, {"src": "craigslist", "reg": "madison", "url": "https://chicago.craigslist.org/cto/d/frankfort-2023-vw-atlas-cross-sport/7929390349.html", "title": "2023 VW Atlas Cross Sport", "price": 25500, "miles": 40000, "year": 2023, "make": "Volkswagen", "model": "Atlas", "loc": "", "photo": "https://images.craigslist.org/00K0K_dN7EE6LjXPi_0fu0bC_600x450.jpg", "pred": 35413, "score": 28.0, "savings": 9913, "label": "great", "flags": []}, {"src": "craigslist", "reg": "eauclaire", "url": "https://milwaukee.craigslist.org/cto/d/hartford-chevy-silverado-four-wheel/7930220044.html", "title": "2015 1500 Chevy Silverado four-wheel-drive", "price": 22800, "miles": 64100, "year": 2015, "make": "Chevrolet", "model": "Silverado", "loc": "", "photo": "https://images.craigslist.org/01313_dpwh73lDd5B_0CI0t2_600x450.jpg", "pred": 30840, "score": 26.1, "savings": 8040, "label": "great", "flags": []}, {"src": "craigslist", "reg": "wausau", "url": "https://chicago.craigslist.org/cto/d/chicago-toyota-rav4-xle-awd-2016/7931434263.html", "title": "Toyota Rav4 XLE Awd 2016", "price": 11700, "miles": 166000, "year": 2016, "make": "Toyota", "model": "Rav4", "loc": "", "photo": "https://images.craigslist.org/00t0t_g2KptR432No_0CI0t2_600x450.jpg", "pred": 15800, "score": 25.9, "savings": 4100, "label": "great", "flags": []}, {"src": "craigslist", "reg": "duluth", "url": "https://minneapolis.craigslist.org/cto/d/saint-paul-2016-toyota-sienna-se/7926758693.html", "title": "2016 Toyota Sienna SE", "price": 21000, "miles": 86000, "year": 2016, "make": "Toyota", "model": "Sienna", "loc": "", "photo": "https://images.craigslist.org/00p0p_dhZdWb0sREk_0t20CI_600x450.jpg", "pred": 27900, "score": 24.7, "savings": 6900, "label": "great", "flags": []}, {"src": "craigslist", "reg": "minneapolis", "url": "https://minneapolis.craigslist.org/cto/d/duluth-2015-ford-suv-lifted-low-hours/7932424010.html", "title": "2015 Ford SUV LIFTED low hours", "price": 8500, "miles": 157000, "year": 2015, "make": "Ford", "model": "SUV", "loc": "", "photo": "https://images.craigslist.org/00505_k4TJk3nIPen_0CI0t2_600x450.jpg", "pred": 11162, "score": 23.8, "savings": 2662, "label": "great", "flags": []}, {"src": "craigslist", "reg": "madison", "url": "https://southbend.craigslist.org/cto/d/granger-2022-rav-awd-xle-suv/7930729872.html", "title": "2022 Rav 4 AWD XLE SUV", "price": 27500, "miles": 44500, "year": 2022, "make": "", "model": "", "loc": "", "photo": "https://images.craigslist.org/00e0e_gbAH20bHbDi_0hq0d4_600x450.jpg", "pred": 35991, "score": 23.6, "savings": 8491, "label": "great", "flags": []}, {"src": "craigslist", "reg": "lacrosse", "url": "https://desmoines.craigslist.org/cto/d/urbandale-2015-chevy-equinox-lt/7932181902.html", "title": "2015 Chevy equinox lt", "price": 5400, "miles": 124000, "year": 2015, "make": "Chevrolet", "model": "equinox", "loc": "", "photo": "https://images.craigslist.org/00P0P_k5i7Hkcqxhi_0t20Cz_600x450.jpg", "pred": 6800, "score": 20.6, "savings": 1400, "label": "great", "flags": []}, {"src": "craigslist", "reg": "madison", "url": "https://chicago.craigslist.org/cto/d/wheeling-2017-ford-f250/7932548780.html", "title": "2017 FORD F250", "price": 12498, "miles": 168000, "year": 2017, "make": "Ford", "model": "F250", "loc": "", "photo": "https://images.craigslist.org/00s0s_kEqlBbPWPvs_0CI0t2_600x450.jpg", "pred": 15500, "score": 19.4, "savings": 3002, "label": "great", "flags": []}, {"src": "craigslist", "reg": "eauclaire", "url": "https://janesville.craigslist.org/cto/d/delavan-2016-chevy-equinox-ltz/7932520782.html", "title": "2016 Chevy equinox LTZ", "price": 5500, "miles": 134000, "year": 2016, "make": "Chevrolet", "model": "equinox", "loc": "", "photo": "https://images.craigslist.org/00F0F_lDfPekiE0Z1_0CI0t2_600x450.jpg", "pred": 6800, "score": 19.1, "savings": 1300, "label": "great", "flags": []}, {"src": "craigslist", "reg": "duluth", "url": "https://wausau.craigslist.org/cto/d/birnamwood-2021-cheverolet-silverado-x4/7928598341.html", "title": "2021 Cheverolet Silverado 1500 4x4 excellent condition", "price": 27950, "miles": 49900, "year": 2021, "make": "", "model": "", "loc": "", "photo": "https://images.craigslist.org/00x0x_lnakvE4H22b_0CI0t2_600x450.jpg", "pred": 33867, "score": 17.5, "savings": 5917, "label": "great", "flags": []}, {"src": "craigslist", "reg": "madison", "url": "https://chicago.craigslist.org/cto/d/palatine-2015-ford-escape-se-fwd/7930820872.html", "title": "2015 Ford Escape SE FWD", "price": 6900, "miles": 108000, "year": 2015, "make": "Ford", "model": "Escape", "loc": "", "photo": "https://images.craigslist.org/00404_jqAZNo1xP7L_0Cz0t2_600x450.jpg", "pred": 8331, "score": 17.2, "savings": 1431, "label": "great", "flags": []}, {"src": "craigslist", "reg": "madison", "url": "https://chicago.craigslist.org/cto/d/evergreen-park-2018-ford-escape-se/7931398370.html", "title": "2018 ford escape se", "price": 7500, "miles": 125000, "year": 2018, "make": "Ford", "model": "escape", "loc": "", "photo": "https://images.craigslist.org/00T0T_eG8PgK7OUjj_0CI0t2_600x450.jpg", "pred": 8999, "score": 16.7, "savings": 1499, "label": "great", "flags": []}, {"src": "craigslist", "reg": "duluth", "url": "https://lacrosse.craigslist.org/cto/d/stockton-2015-ford-escape/7928940731.html", "title": "2015 Ford Escape", "price": 6999, "miles": 157000, "year": 2015, "make": "Ford", "model": "Escape", "loc": "", "photo": "https://images.craigslist.org/00S0S_aUAEtZsB5fm_0t20CI_600x450.jpg", "pred": 8397, "score": 16.6, "savings": 1398, "label": "great", "flags": []}, {"src": "craigslist", "reg": "wausau", "url": "https://chicago.craigslist.org/cto/d/west-chicago-toyota-camry-2019/7927935101.html", "title": "Toyota Camry 2019", "price": 20700, "miles": 91527, "year": 2019, "make": "Toyota", "model": "Camry", "loc": "", "photo": "https://images.craigslist.org/00r0r_ij7nkkWDJ3g_0t20CI_600x450.jpg", "pred": 24509, "score": 15.5, "savings": 3809, "label": "great", "flags": []}, {"src": "craigslist", "reg": "duluth", "url": "https://grandforks.craigslist.org/cto/d/thief-river-falls-chevy-silverado-2015/7929457243.html", "title": "CHEVY Silverado 2015", "price": 9000, "miles": 250000, "year": 2015, "make": "Chevrolet", "model": "Silverado", "loc": "", "photo": "https://images.craigslist.org/00S0S_9GZFxC9j1mm_0lM0t2_600x450.jpg", "pred": 10454, "score": 13.9, "savings": 1454, "label": "good", "flags": []}, {"src": "craigslist", "reg": "duluth", "url": "https://fargo.craigslist.org/cto/d/grand-forks-2015-chevy-silverado/7927461962.html", "title": "2015 CHEVY SILVERADO", "price": 9000, "miles": 250000, "year": 2015, "make": "Chevrolet", "model": "SILVERADO", "loc": "", "photo": "https://images.craigslist.org/00S0S_9GZFxC9j1mm_0lM0t2_600x450.jpg", "pred": 10454, "score": 13.9, "savings": 1454, "label": "good", "flags": []}, {"src": "craigslist", "reg": "duluth", "url": "https://minneapolis.craigslist.org/cto/d/rockford-2024-ford-maverick-hybrid/7932149105.html", "title": "2024 Ford Maverick Hybrid Lariat", "price": 42000, "miles": 16390, "year": 2024, "make": "Ford", "model": "Maverick", "loc": "", "photo": "https://images.craigslist.org/00808_aoLzXXErgW2_0lM0t2_600x450.jpg", "pred": 47900, "score": 12.3, "savings": 5900, "label": "good", "flags": []}, {"src": "craigslist", "reg": "madison", "url": "https://chicago.craigslist.org/cto/d/chicago-2015-chevy-malibu-ltz/7931283890.html", "title": "2015 Chevy Malibu LTZ", "price": 5600, "miles": 106000, "year": 2015, "make": "Chevrolet", "model": "Malibu", "loc": "", "photo": "https://images.craigslist.org/01414_d2gFpqhlVn3_0CI0t2_600x450.jpg", "pred": 6375, "score": 12.2, "savings": 775, "label": "good", "flags": []}, {"src": "craigslist", "reg": "wausau", "url": "https://muskegon.craigslist.org/cto/d/hesperia-2016-ford-edge-sel-35l-awd/7930791152.html", "title": "2016 Ford Edge SEL 3.5L AWD", "price": 11800, "miles": 130688, "year": 2016, "make": "Ford", "model": "Edge", "loc": "", "photo": "https://images.craigslist.org/01212_lfBDdcl6Pv8_0t20CI_600x450.jpg", "pred": 13341, "score": 11.6, "savings": 1541, "label": "good", "flags": []}, {"src": "craigslist", "reg": "duluth", "url": "https://minneapolis.craigslist.org/cto/d/saint-paul-wd-ford-escape/7930175470.html", "title": "2016 4WD Ford Escape", "price": 8999, "miles": 88913, "year": 2016, "make": "Ford", "model": "Escape", "loc": "", "photo": "https://images.craigslist.org/00z0z_bBlvluTZThh_0ak07K_600x450.jpg", "pred": 10160, "score": 11.4, "savings": 1161, "label": "good", "flags": []}, {"src": "craigslist", "reg": "lacrosse", "url": "https://quadcities.craigslist.org/cto/d/rock-island-2015-150-lariat/7931538191.html", "title": "2015 f-150 lariat", "price": 7000, "miles": 300000, "year": 2015, "make": "", "model": "", "loc": "", "photo": "https://images.craigslist.org/00j0j_fCUB3LXFZi3_0CI0t2_600x450.jpg", "pred": 7891, "score": 11.3, "savings": 891, "label": "good", "flags": []}, {"src": "craigslist", "reg": "duluth", "url": "https://minneapolis.craigslist.org/cto/d/victoria-2020-mercedes-benz-glc-300/7932308913.html", "title": "2020 Mercedes-Benz GLC 300 4MATIC \u2014 Original Owner |  Loaded", "price": 23900, "miles": 83500, "year": 2020, "make": "Mercedes", "model": "-Benz", "loc": "", "photo": "https://images.craigslist.org/00L0L_aIa3iC2o0oY_0CI0t2_600x450.jpg", "pred": 26719, "score": 10.6, "savings": 2819, "label": "good", "flags": []}, {"src": "craigslist", "reg": "wausau", "url": "https://chicago.craigslist.org/cto/d/lombard-2019-toyota-highlander-awd-only/7931703993.html", "title": "2019 Toyota Highlander AWD only 53000 miles 1 owner", "price": 26750, "miles": 53000, "year": 2019, "make": "Toyota", "model": "Highlander", "loc": "", "photo": "https://images.craigslist.org/00I0I_cW2YYlQrrI_0CI0t2_600x450.jpg", "pred": 29280, "score": 8.6, "savings": 2530, "label": "good", "flags": []}, {"src": "craigslist", "reg": "madison", "url": "https://chicago.craigslist.org/cto/d/chicago-ft-box-truck-with-ramp/7927531066.html", "title": "2022 15ft Box truck with ramp", "price": 23500, "miles": 117063, "year": 2022, "make": "", "model": "", "loc": "", "photo": "https://images.craigslist.org/00m0m_2ko7CmV9OMs_0CI0t2_600x450.jpg", "pred": 25533, "score": 8.0, "savings": 2033, "label": "good", "flags": []}, {"src": "craigslist", "reg": "duluth", "url": "https://minneapolis.craigslist.org/cto/d/maple-plain-2018-ford-150-xlt-4x4-clean/7928567892.html", "title": "2018 Ford F-150 XLT 4x4 - Clean Title, LOW MILES", "price": 25000, "miles": 55850, "year": 2018, "make": "Ford", "model": "F-150", "loc": "", "photo": "https://images.craigslist.org/01313_1NyVqjmIcM1_0CI0pw_600x450.jpg", "pred": 27000, "score": 7.4, "savings": 2000, "label": "good", "flags": []}, {"src": "craigslist", "reg": "minneapolis", "url": "https://madison.craigslist.org/cto/d/madison-2016-toyota-highlander-sold/7928792097.html", "title": "2016 Toyota Highlander - SOLD", "price": 19500, "miles": 116000, "year": 2016, "make": "Toyota", "model": "Highlander", "loc": "", "photo": "https://images.craigslist.org/00z0z_hcTbVAhG9OH_0t20CI_600x450.jpg", "pred": 20899, "score": 6.7, "savings": 1399, "label": "good", "flags": []}, {"src": "craigslist", "reg": "wausau", "url": "https://chicago.craigslist.org/cto/d/wheeling-2021-like-new-toyota-venza-le/7930635461.html", "title": "2021 Like New Toyota Venza LE", "price": 27500, "miles": 83429, "year": 2021, "make": "Toyota", "model": "Venza", "loc": "", "photo": "https://images.craigslist.org/00t0t_aasplrNjdrs_1u8176_600x450.jpg", "pred": 29030, "score": 5.3, "savings": 1530, "label": "good", "flags": []}, {"src": "craigslist", "reg": "duluth", "url": "https://minneapolis.craigslist.org/cto/d/minneapolis-2016-toyota-rav4-hybrid/7929606433.html", "title": "2016 Toyota rav4 hybrid Limited Sport Utility 4D", "price": 15000, "miles": 150000, "year": 2016, "make": "Toyota", "model": "rav4", "loc": "", "photo": "https://images.craigslist.org/00f0f_7mIQ2ZAPQR_0fu0bC_600x450.jpg", "pred": 15800, "score": 5.1, "savings": 800, "label": "good", "flags": []}, {"src": "craigslist", "reg": "madison", "url": "https://chicago.craigslist.org/cto/d/plainfield-ford-250-super-duty-miles/7929261226.html", "title": "Ford F-250 Super Duty 2016 123k miles", "price": 12999, "miles": 123000, "year": 2016, "make": "Ford", "model": "F-250", "loc": "", "photo": "https://images.craigslist.org/00y0y_hcyuCH7kDu6_0CI0t2_600x450.jpg", "pred": 13670, "score": 4.9, "savings": 671, "label": "fair", "flags": []}, {"src": "craigslist", "reg": "eauclaire", "url": "https://milwaukee.craigslist.org/cto/d/oconomowoc-2016-chevy-malibu-lt/7930121864.html", "title": "2016 Chevy Malibu LT", "price": 6000, "miles": 191000, "year": 2016, "make": "Chevrolet", "model": "Malibu", "loc": "", "photo": "https://images.craigslist.org/00k0k_iDCI2l13yuY_0t20CI_600x450.jpg", "pred": 6291, "score": 4.6, "savings": 291, "label": "fair", "flags": []}, {"src": "craigslist", "reg": "madison", "url": "https://chicago.craigslist.org/cto/d/chicago-2016-chevy-malibu-lt-runs-great/7930216827.html", "title": "2016 Chevy Malibu LT 2016 \u2013 Runs Great\u2013 Clean \u2013 Priced to Sell", "price": 6200, "miles": 141526, "year": 2016, "make": "Chevrolet", "model": "Malibu", "loc": "", "photo": "https://images.craigslist.org/00I0I_kMf3MZmhcvi_0CI0t2_600x450.jpg", "pred": 6500, "score": 4.6, "savings": 300, "label": "fair", "flags": []}, {"src": "craigslist", "reg": "duluth", "url": "https://duluth.craigslist.org/cto/d/duluth-2022-toyota-venza-le-gold/7931650436.html", "title": "2022 Toyota Venza LE Gold Certified Pre-Owned", "price": 31600, "miles": 58483, "year": 2022, "make": "Toyota", "model": "Venza", "loc": "", "photo": "https://images.craigslist.org/00q0q_YZzGFe6MeJ_0fa0cI_600x450.jpg", "pred": 32942, "score": 4.1, "savings": 1342, "label": "fair", "flags": []}, {"src": "craigslist", "reg": "duluth", "url": "https://minneapolis.craigslist.org/cto/d/minneapolis-gold-certified-pre-owned/7931650420.html", "title": "Gold Certified Pre-Owned 2022 Toyota Venza LE", "price": 31600, "miles": 58483, "year": 2022, "make": "Toyota", "model": "Venza", "loc": "", "photo": "https://images.craigslist.org/00q0q_YZzGFe6MeJ_0fa0cI_600x450.jpg", "pred": 32942, "score": 4.1, "savings": 1342, "label": "fair", "flags": []}, {"src": "craigslist", "reg": "wausau", "url": "https://chicago.craigslist.org/cto/d/arlington-heights-2024-chevy-blazer-rs/7931138703.html", "title": "2024 Chevy Blazer RS ORIGINAL OWNER", "price": 36500, "miles": 29500, "year": 2024, "make": "Chevrolet", "model": "Blazer", "loc": "", "photo": "https://images.craigslist.org/00q0q_dLhXXRgVJov_0CI0t2_600x450.jpg", "pred": 37999, "score": 3.9, "savings": 1499, "label": "fair", "flags": []}, {"src": "craigslist", "reg": "eauclaire", "url": "https://chicago.craigslist.org/cto/d/gurnee-2015-chevy-malibu-lt/7930906266.html", "title": "2015 Chevy Malibu LT", "price": 6250, "miles": 100320, "year": 2015, "make": "Chevrolet", "model": "Malibu", "loc": "", "photo": "https://images.craigslist.org/00b0b_498L70juWau_0CI0t2_600x450.jpg", "pred": 6500, "score": 3.8, "savings": 250, "label": "fair", "flags": []}, {"src": "craigslist", "reg": "duluth", "url": "https://mankato.craigslist.org/cto/d/mankato-2020-ford-f150-supercap-27l-xlt/7929107161.html", "title": "2020 Ford F150 Supercap 2.7L XLT", "price": 14495, "miles": 177000, "year": 2020, "make": "Ford", "model": "F150", "loc": "", "photo": "https://images.craigslist.org/00j0j_4kZI4pMIbrb_0Cc0t2_600x450.jpg", "pred": 15000, "score": 3.4, "savings": 505, "label": "fair", "flags": []}, {"src": "craigslist", "reg": "madison", "url": "https://chicago.craigslist.org/cto/d/evergreen-park-2017-ford-escape-titanium/7931398600.html", "title": "2017 ford escape titanium", "price": 7500, "miles": 133000, "year": 2017, "make": "Ford", "model": "escape", "loc": "", "photo": "https://images.craigslist.org/00w0w_jQNb1pORobL_0CI0t2_600x450.jpg", "pred": 7487, "score": -0.2, "savings": -13, "label": "fair", "flags": []}, {"src": "craigslist", "reg": "duluth", "url": "https://appleton.craigslist.org/cto/d/marion-2021-ford-f250-xl/7926540775.html", "title": "2021 Ford F250 XL", "price": 44950, "miles": 39500, "year": 2021, "make": "Ford", "model": "F250", "loc": "", "photo": "https://images.craigslist.org/00808_tQtMGXn6fg_0CI0t2_600x450.jpg", "pred": 44580, "score": -0.8, "savings": -370, "label": "fair", "flags": []}, {"src": "craigslist", "reg": "minneapolis", "url": "https://minneapolis.craigslist.org/cto/d/cottage-grove-2016-chevrolet-silverado/7930528795.html", "title": "2016 Chevrolet Silverado LT Z71", "price": 13900, "miles": 172473, "year": 2016, "make": "Chevrolet", "model": "Silverado", "loc": "", "photo": "https://images.craigslist.org/00e0e_8y4t0b2xDyM_0CI0t2_600x450.jpg", "pred": 13750, "score": -1.1, "savings": -150, "label": "fair", "flags": []}, {"src": "craigslist", "reg": "wausau", "url": "https://nmi.craigslist.org/cto/d/traverse-city-2025-toyota-camry-xse/7931837312.html", "title": "2025 Toyota Camry XSE Hybrid 44mpg", "price": 37500, "miles": 15000, "year": 2025, "make": "Toyota", "model": "Camry", "loc": "", "photo": "https://images.craigslist.org/00d0d_llXRnpJHhzp_0CI0t2_600x450.jpg", "pred": 37029, "score": -1.3, "savings": -471, "label": "fair", "flags": []}, {"src": "craigslist", "reg": "madison", "url": "https://chicago.craigslist.org/cto/d/des-plaines-2019-chevy-blazer-rs-awd/7932513618.html", "title": "2019 CHEVY BLAZER RS AWD", "price": 19000, "miles": 90800, "year": 2019, "make": "Chevrolet", "model": "BLAZER", "loc": "", "photo": "https://images.craigslist.org/00l0l_jFOyB6wZCdK_0CI0t2_600x450.jpg", "pred": 18518, "score": -2.6, "savings": -482, "label": "fair", "flags": []}, {"src": "craigslist", "reg": "wausau", "url": "https://chicago.craigslist.org/cto/d/des-plaines-for-sale-2024-toyota-rav4/7929322305.html", "title": "\ud83d\ude97 FOR SALE: 2024 Toyota RAV4 Hybrid Limited AWD \u2013 FULLY LOADED / TOP", "price": 37500, "miles": 54000, "year": 2024, "make": "Toyota", "model": "RAV4", "loc": "", "photo": "https://images.craigslist.org/00303_iEDalqmJMdk_0t20CI_600x450.jpg", "pred": 36347, "score": -3.2, "savings": -1153, "label": "fair", "flags": []}, {"src": "craigslist", "reg": "wausau", "url": "https://nmi.craigslist.org/cto/d/alden-excellent-condition-2021-toyota/7926712437.html", "title": "EXCELLENT CONDITION 2021 TOYOTA HIGHLANDER XSE", "price": 30200, "miles": 71800, "year": 2021, "make": "Toyota", "model": "HIGHLANDER", "loc": "", "photo": "https://images.craigslist.org/00G0G_gvBpKnpeJOv_0CI0t2_600x450.jpg", "pred": 29100, "score": -3.8, "savings": -1100, "label": "fair", "flags": []}, {"src": "craigslist", "reg": "duluth", "url": "https://minneapolis.craigslist.org/cto/d/mound-ford-f150-sport-4x4/7929183645.html", "title": "2021 / 22Ford F150 Sport 4x4", "price": 38000, "miles": 33000, "year": 2021, "make": "", "model": "", "loc": "", "photo": "https://images.craigslist.org/00R0R_eLAT47s6oIV_0CI0lM_600x450.jpg", "pred": 36407, "score": -4.4, "savings": -1593, "label": "fair", "flags": []}, {"src": "craigslist", "reg": "eauclaire", "url": "https://milwaukee.craigslist.org/cto/d/milwaukee-2016-chevy-malibu/7931534010.html", "title": "2016 Chevy Malibu", "price": 6500, "miles": 132000, "year": 2016, "make": "Chevrolet", "model": "Malibu", "loc": "", "photo": "https://images.craigslist.org/00O0O_f7AIHgMckZE_0CI0t2_600x450.jpg", "pred": 6225, "score": -4.4, "savings": -275, "label": "fair", "flags": []}, {"src": "craigslist", "reg": "duluth", "url": "https://minneapolis.craigslist.org/cto/d/bruno-2017-chevrolet-impala/7927033319.html", "title": "2017 Chevrolet Impala.", "price": 12500, "miles": 99200, "year": 2017, "make": "Chevrolet", "model": "Impala", "loc": "", "photo": "https://images.craigslist.org/00909_hJqdolqZGeJ_0CI0t2_600x450.jpg", "pred": 11964, "score": -4.5, "savings": -536, "label": "fair", "flags": []}, {"src": "craigslist", "reg": "duluth", "url": "https://eauclaire.craigslist.org/cto/d/downing-2016-colorado-ext-cab-4wd-36l/7932272283.html", "title": "2016 Colorado Ext cab 4WD 3.6L 6' bed  LT", "price": 14500, "miles": 128000, "year": 2016, "make": "", "model": "", "loc": "", "photo": "https://images.craigslist.org/00F0F_38XY2zXsOpK_0qN0g9_600x450.jpg", "pred": 13869, "score": -4.5, "savings": -631, "label": "fair", "flags": []}, {"src": "iaa", "reg": "iaa-us", "url": "https://www.iaai.com/VehicleDetail/45379337~US", "title": "2018 Ford TAURUS SE", "price": 0, "miles": 52052, "year": 2018, "make": "Ford", "model": "TAURUS", "loc": "", "photo": "https://vis.iaai.com/resizer?imageKeys=45379337~SID~I1&width=400&height=300", "pred": 0, "score": null, "savings": null, "label": "salvage", "flags": []}, {"src": "iaa", "reg": "iaa-us", "url": "https://www.iaai.com/VehicleDetail/45378551~US", "title": "2019 Ford TRANSIT-350", "price": 0, "miles": 81722, "year": 2019, "make": "Ford", "model": "TRANSIT-350", "loc": "", "photo": "https://vis.iaai.com/resizer?imageKeys=45378551~SID~I1&width=400&height=300", "pred": 0, "score": null, "savings": null, "label": "salvage", "flags": []}, {"src": "iaa", "reg": "iaa-us", "url": "https://www.iaai.com/VehicleDetail/45327624~US", "title": "2019 Ram 1500 CLASSIC TRADESMAN  4X2 8&#x27; BOX", "price": 0, "miles": 33122, "year": 2019, "make": "Ram", "model": "1500 CLASSIC", "loc": "", "photo": "https://vis.iaai.com/resizer?imageKeys=45327624~SID~I1&width=400&height=300", "pred": 0, "score": null, "savings": null, "label": "salvage", "flags": []}, {"src": "iaa", "reg": "iaa-us", "url": "https://www.iaai.com/VehicleDetail/45195917~US", "title": "2016 Ram 1500 TRADESMAN", "price": 0, "miles": 90863, "year": 2016, "make": "Ram", "model": "1500", "loc": "", "photo": "https://vis.iaai.com/resizer?imageKeys=45195917~SID~I1&width=400&height=300", "pred": 0, "score": null, "savings": null, "label": "salvage", "flags": []}, {"src": "iaa", "reg": "iaa-us", "url": "https://www.iaai.com/VehicleDetail/45193374~US", "title": "2020 Gmc TERRAIN AWD SLE", "price": 0, "miles": 107986, "year": 2020, "make": "Gmc", "model": "TERRAIN", "loc": "", "photo": "https://vis.iaai.com/resizer?imageKeys=45193374~SID~I1&width=400&height=300", "pred": 0, "score": null, "savings": null, "label": "salvage", "flags": []}, {"src": "craigslist", "reg": "duluth", "url": "https://duluth.craigslist.org/cto/d/britt-ford-escape-sel-ecoboost-4wd/7929679797.html", "title": "Ford Escape SEL EcoBoost 4WD", "price": 16000, "miles": 49000, "year": 0, "make": "Ford", "model": "Escape", "loc": "", "photo": "https://images.craigslist.org/00N0N_kxIBw1YR7Cu_0t20CI_600x450.jpg", "pred": null, "score": null, "savings": null, "label": "insufficient-data", "flags": []}, {"src": "craigslist", "reg": "duluth", "url": "https://minneapolis.craigslist.org/cto/d/saint-paul-ford-f350-tailgate-2020/7926741406.html", "title": "Ford F350 Tailgate 2020", "price": 250, "miles": 10000, "year": 2020, "make": "Ford", "model": "F350", "loc": "", "photo": "https://images.craigslist.org/00V0V_fk13qLzODy4_0CI0t2_600x450.jpg", "pred": null, "score": null, "savings": null, "label": "insufficient-data", "flags": []}, {"src": "craigslist", "reg": "duluth", "url": "https://minneapolis.craigslist.org/cto/d/burnsville-ford-f250/7927104112.html", "title": "Ford F250", "price": 13000, "miles": 111000, "year": 0, "make": "Ford", "model": "F250", "loc": "", "photo": "https://images.craigslist.org/00X0X_5YEN3qYEZhn_0xS0pq_600x450.jpg", "pred": null, "score": null, "savings": null, "label": "insufficient-data", "flags": []}, {"src": "craigslist", "reg": "duluth", "url": "https://minneapolis.craigslist.org/cto/d/stillwater-toyota-tundra-1794-edition/7928025958.html", "title": "Toyota Tundra 1794 Edition Crew Max", "price": 30750, "miles": 133500, "year": 0, "make": "Toyota", "model": "Tundra", "loc": "", "photo": "https://images.craigslist.org/01717_kVfdWJUzuyf_0Cz0t2_600x450.jpg", "pred": null, "score": null, "savings": null, "label": "insufficient-data", "flags": []}, {"src": "craigslist", "reg": "duluth", "url": "https://minneapolis.craigslist.org/cto/d/albertville-2020-toyota-sienna/7929767701.html", "title": "2020 Toyota Sienna Wheelchair van", "price": 33, "miles": 63435, "year": 2020, "make": "Toyota", "model": "Sienna", "loc": "", "photo": "https://images.craigslist.org/00X0X_RI1vkcbXJo_0lN0CI_600x450.jpg", "pred": null, "score": null, "savings": null, "label": "insufficient-data", "flags": []}, {"src": "craigslist", "reg": "duluth", "url": "https://appleton.craigslist.org/cto/d/winneconne-toyota-tacoma-4x4/7932648867.html", "title": "Toyota Tacoma 4x4", "price": 32000, "miles": 52550, "year": 0, "make": "Toyota", "model": "Tacoma", "loc": "", "photo": "https://images.craigslist.org/01616_gS1Eu1pGdxX_0t20CI_600x450.jpg", "pred": null, "score": null, "savings": null, "label": "insufficient-data", "flags": []}, {"src": "craigslist", "reg": "eauclaire", "url": "https://milwaukee.craigslist.org/cto/d/kewaskum-toyota-tundra-trd-crew-cab-x/7928439893.html", "title": "Toyota tundra TRD crew cab, 4 x 4 great shape!", "price": 31000, "miles": 153000, "year": 0, "make": "Toyota", "model": "tundra", "loc": "", "photo": "https://images.craigslist.org/00t0t_7b6BRq0fr0U_0t20CI_600x450.jpg", "pred": null, "score": null, "savings": null, "label": "insufficient-data", "flags": []}, {"src": "craigslist", "reg": "wausau", "url": "https://chicago.craigslist.org/cto/d/chicago-24-ford-escape-st-line-select/7927822810.html", "title": "24 Ford Escape ST-Line Select AWD Only 2,450 miles", "price": 23800, "miles": 2450, "year": 0, "make": "Ford", "model": "Escape", "loc": "", "photo": "https://images.craigslist.org/00y0y_6AFcYBQyKi_1320MM_600x450.jpg", "pred": null, "score": null, "savings": null, "label": "insufficient-data", "flags": []}, {"src": "craigslist", "reg": "stcloud", "url": "https://siouxfalls.craigslist.org/cto/d/crooks-ford-edge-titanium-like-new-miles/7928585639.html", "title": "Ford Edge Titanium - Like New - 49788 miles", "price": 19875, "miles": 49788, "year": 0, "make": "Ford", "model": "Edge", "loc": "", "photo": "https://images.craigslist.org/01313_eaR1QYyy6zY_0d40hq_600x450.jpg", "pred": null, "score": null, "savings": null, "label": "insufficient-data", "flags": []}, {"src": "craigslist", "reg": "madison", "url": "https://chicago.craigslist.org/cto/d/elgin-ford-f350-4x4/7931435171.html", "title": "Ford f350 4x4", "price": 21500, "miles": 260000, "year": 0, "make": "Ford", "model": "f350", "loc": "", "photo": "https://images.craigslist.org/00o0o_bF9RpgFls8H_0CI0t2_600x450.jpg", "pred": null, "score": null, "savings": null, "label": "insufficient-data", "flags": []}, {"src": "craigslist", "reg": "madison", "url": "https://chicago.craigslist.org/cto/d/wood-dale-tow-truck-ford-550-xlt/7931406898.html", "title": "Tow truck ford 550 XLT", "price": 43000, "miles": 107000, "year": 0, "make": "Ford", "model": "550", "loc": "", "photo": "https://images.craigslist.org/00A0A_im97ts61ocj_0CI0t1_600x450.jpg", "pred": null, "score": null, "savings": null, "label": "insufficient-data", "flags": []}, {"src": "craigslist", "reg": "madison", "url": "https://chicago.craigslist.org/cto/d/oak-park-ford-fiesta-se/7929577491.html", "title": "Ford fiesta se", "price": 3800, "miles": 111000, "year": 0, "make": "Ford", "model": "fiesta", "loc": "", "photo": "https://images.craigslist.org/00m0m_24mMDKi1W5T_0CI0t2_600x450.jpg", "pred": null, "score": null, "savings": null, "label": "insufficient-data", "flags": []}, {"src": "craigslist", "reg": "madison", "url": "https://chicago.craigslist.org/cto/d/chicago-ford21-ranger-xlt-great-truck/7932343336.html", "title": "FORD'21 Ranger XLT - Great Truck", "price": 14200, "miles": 13400, "year": 0, "make": "Ford", "model": "", "loc": "", "photo": "https://images.craigslist.org/00J0J_70G8GC0Xbrd_0cU09G_600x450.jpg", "pred": null, "score": null, "savings": null, "label": "insufficient-data", "flags": []}, {"src": "craigslist", "reg": "madison", "url": "https://madison.craigslist.org/cto/d/portage-silverado-1500-rst-z71/7930631235.html", "title": "Silverado 1500 RST Z71", "price": 22500, "miles": 149000, "year": 0, "make": "", "model": "", "loc": "", "photo": "https://images.craigslist.org/00n0n_bknoenI4AsK_0t20CI_600x450.jpg", "pred": null, "score": null, "savings": null, "label": "insufficient-data", "flags": []}, {"src": "craigslist", "reg": "madison", "url": "https://chicago.craigslist.org/cto/d/chicago-mint-2023-chevy-malibu-for-rent/7926374870.html", "title": "Mint 2023 Chevy Malibu for Rent", "price": 330, "miles": 106000, "year": 2023, "make": "Chevrolet", "model": "Malibu", "loc": "", "photo": "https://images.craigslist.org/00C0C_f1sj2yhyC4k_0i60dw_600x450.jpg", "pred": null, "score": null, "savings": null, "label": "insufficient-data", "flags": []}, {"src": "craigslist", "reg": "madison", "url": "https://chicago.craigslist.org/cto/d/chicago-chevy-traverse/7930785080.html", "title": "CHEVY Traverse", "price": 7000, "miles": 84000, "year": 0, "make": "Chevrolet", "model": "Traverse", "loc": "", "photo": "https://images.craigslist.org/00Q0Q_kgvhn4eBKoL_0CI0t2_600x450.jpg", "pred": null, "score": null, "savings": null, "label": "insufficient-data", "flags": []}]};
+const ALL = DATA.listings;
+
+document.getElementById('sub').textContent =
+  'Last run: ' + (DATA.meta.started_at_iso || '?') + '  -  ' + ALL.length + ' private-seller cars/trucks/SUVs within ~200mi of Hayward, WI (Craigslist + Facebook Marketplace, 2015+, clean title)';
+
+const counts = {great:0, good:0, fair:0, overpriced:0, salvage:0, flags:0};
+ALL.forEach(r => {
+  if (r.label && counts[r.label] !== undefined) counts[r.label]++;
+  if (r.flags && r.flags.length) counts.flags++;
+});
+document.getElementById('cnt-great').textContent = counts.great;
+document.getElementById('cnt-good').textContent = counts.good;
+document.getElementById('cnt-fair').textContent = counts.fair;
+document.getElementById('cnt-over').textContent = counts.overpriced;
+document.getElementById('cnt-salvage').textContent = counts.salvage;
+document.getElementById('cnt-flags').textContent = counts.flags;
+document.getElementById('cnt-total').textContent = ALL.length;
+
+let activeFilter = 'all';
+let activeView = 'cards';
+let maxPrice = null;
+let maxMiles = null;
+
+function applyFilters(rows) {
+  return rows.filter(r => {
+    if (activeFilter === 'great' && r.label !== 'great') return false;
+    if (activeFilter === 'good' && !['great','good'].includes(r.label)) return false;
+    if (activeFilter === 'ford' && (r.make || '').toLowerCase() !== 'ford') return false;
+    if (activeFilter === 'cl' && r.src !== 'craigslist') return false;
+    if (activeFilter === 'fb' && r.src !== 'facebook') return false;
+    if (activeFilter === 'iaa' && r.src !== 'iaa') return false;
+    if (activeFilter === 'noflags' && r.flags.length) return false;
+    if (maxPrice && r.price > maxPrice) return false;
+    if (maxMiles && r.miles > maxMiles) return false;
+    return true;
+  });
+}
+
+function fmt$(n) { return n != null ? '$' + n.toLocaleString() : '-'; }
+function fmtPct(p) { return p != null ? (p > 0 ? '+' : '') + p.toFixed(1) + '%' : '-'; }
+function fmtMiles(m) { return m ? m.toLocaleString() + ' mi' : ''; }
+function escapeHtml(s) {
+  return (s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function renderCards() {
+  const rows = applyFilters(ALL).sort((a,b)=>(b.score??-999)-(a.score??-999));
+  document.getElementById('count-line').textContent = 'Showing ' + rows.length + ' of ' + ALL.length;
+  const html = rows.map(r => {
+    const photo = r.photo
+      ? `<img src="${r.photo}" loading="lazy" referrerpolicy="no-referrer" onerror="this.parentElement.innerHTML='<div class=\'no-photo\'>No photo</div>'">`
+      : '<div class="no-photo">No photo</div>';
+    const score = `<span class="score-badge score-${r.label || 'na'}">${fmtPct(r.score)}</span>`;
+    const sourceBadge = `<span class="source-badge">${r.src === 'facebook' ? 'FB' : 'Craigslist'}</span>`;
+    const flags = r.flags && r.flags.length
+      ? `<div class="flags">${r.flags.map(f => `<span class="flag">${f}</span>`).join('')}</div>`
+      : '';
+    const savings = r.savings != null
+      ? `<div class="savings ${r.savings < 0 ? 'neg' : ''}">${r.savings > 0 ? 'Below market: ' : 'Above market: '}${fmt$(Math.abs(r.savings))}</div>`
+      : '';
+    const predicted = r.pred ? `<span class="predicted">Predicted ${fmt$(r.pred)}</span>` : '';
+    const recallHtml = (r.recalls != null && r.recalls > 0)
+      ? `<div><span class="recall-badge ${r.recalls > 9 ? 'recall-high' : r.recalls > 3 ? 'recall-mid' : 'recall-low'}">${r.recalls} open recall${r.recalls === 1 ? '' : 's'}</span></div>`
+      : '';
+    const notesHtml = r.notes ? `<div class="photo-notes">${escapeHtml(r.notes)}</div>` : '';
+        const btnClass = r.src === 'facebook' ? 'view-btn fb' : 'view-btn';
+    const btnText = r.src === 'facebook' ? 'View on Facebook ->' : 'View on Craigslist ->';
+    return `
+    <div class="card-deal label-${r.label || 'na'}" data-url="${r.url}">
+      <div class="photo-wrap">
+        ${photo}
+        ${sourceBadge}
+        ${score}
+      </div>
+      <div class="body">
+        <h3>${escapeHtml(r.title || '')}</h3>
+        <div class="price-row">
+          <span class="price">${fmt$(r.price)}</span>
+          ${predicted}
+        </div>
+        ${savings}
+        <div class="specs">
+          ${fmtMiles(r.miles)}
+          ${r.miles && r.year ? '<span class="dot">.</span>' : ''}
+          ${r.year || ''}
+          ${(r.year && r.loc) ? '<span class="dot">.</span>' : ''}
+          ${escapeHtml(r.loc || r.reg || '')}
+        </div>
+        ${flags}
+        ${recallHtml}
+        ${notesHtml}
+      </div>
+      <div class="actions">
+        <a class="${btnClass}" href="${r.url}" target="_blank" rel="noopener">${btnText}</a>
+        <button class="remove-btn" data-remove="1" title="Hide this listing from future runs">x Remove</button>
+      </div>
+    </div>`;
+  }).join('');
+  document.getElementById('cards-view').innerHTML = html || '<div style="grid-column:1/-1;color:#888;text-align:center;padding:40px">No listings match these filters.</div>';
+}
+
+let tableSortCol = 'score';
+let tableSortDir = -1;
+function renderTable() {
+  let rows = applyFilters(ALL).slice();
+  rows.sort((a,b) => {
+    const av = a[tableSortCol], bv = b[tableSortCol];
+    if (av == null && bv == null) return 0;
+    if (av == null) return 1;
+    if (bv == null) return -1;
+    if (typeof av === 'string') return tableSortDir * av.localeCompare(bv);
+    return tableSortDir * (av - bv);
+  });
+  const head = `
+    <tr>
+      <th data-col="score">Score</th>
+      <th data-col="savings">Below Mkt</th>
+      <th data-col="price">Price</th>
+      <th data-col="miles">Miles</th>
+      <th data-col="year">Year</th>
+      <th data-col="make">Make</th>
+      <th data-col="model">Model</th>
+      <th>Title</th>
+      <th data-col="loc">Location</th>
+      <th>Flags</th>
+      <th>Photo</th>
+      <th>Link</th>
+    </tr>`;
+  const body = rows.map(r => `
+    <tr class="label-${r.label || 'na'}">
+      <td><span class="score-badge score-${r.label || 'na'}" style="position:static;box-shadow:none">${fmtPct(r.score)}</span></td>
+      <td>${fmt$(r.savings)}</td>
+      <td><b>${fmt$(r.price)}</b></td>
+      <td>${r.miles ? r.miles.toLocaleString() : '-'}</td>
+      <td>${r.year || '-'}</td>
+      <td>${escapeHtml(r.make || '')}</td>
+      <td>${escapeHtml(r.model || '')}</td>
+      <td>${escapeHtml(r.title || '')}</td>
+      <td>${escapeHtml(r.loc || r.reg || '')}</td>
+      <td>${(r.flags || []).map(f => '<span class="flag">'+f+'</span>').join('')}</td>
+      <td>${r.photo ? '<img class="thumb" src="'+r.photo+'" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.display=\'none\'">' : ''}</td>
+      <td><a class="title-link" href="${r.url}" target="_blank" rel="noopener">View ->'</a></td>
+    </tr>`).join('');
+  document.getElementById('table-view').innerHTML = '<table class="table">' + head + body + '</table>';
+  document.getElementById('count-line').textContent = 'Showing ' + rows.length + ' of ' + ALL.length;
+  document.querySelectorAll('#table-view th[data-col]').forEach(th => {
+    th.onclick = () => {
+      const col = th.dataset.col;
+      if (tableSortCol === col) tableSortDir = -tableSortDir;
+      else { tableSortCol = col; tableSortDir = -1; }
+      renderTable();
+    };
+  });
+}
+
+function rerender() {
+  if (activeView === 'cards') {
+    document.getElementById('cards-view').classList.remove('hidden');
+    document.getElementById('table-view').classList.add('hidden');
+    renderCards();
+  } else {
+    document.getElementById('cards-view').classList.add('hidden');
+    document.getElementById('table-view').classList.remove('hidden');
+    renderTable();
+  }
+}
+
+document.querySelectorAll('.controls button[data-filter]').forEach(b => {
+  b.onclick = () => {
+    document.querySelectorAll('.controls button[data-filter]').forEach(x => x.classList.remove('active'));
+    b.classList.add('active');
+    activeFilter = b.dataset.filter;
+    rerender();
+  };
+});
+document.querySelectorAll('.controls button[data-view]').forEach(b => {
+  b.onclick = () => {
+    document.querySelectorAll('.controls button[data-view]').forEach(x => x.classList.remove('active'));
+    b.classList.add('active');
+    activeView = b.dataset.view;
+    rerender();
+  };
+});
+document.getElementById('maxPrice').oninput = (e) => { maxPrice = e.target.value ? +e.target.value : null; rerender(); };
+document.getElementById('maxMiles').oninput = (e) => { maxMiles = e.target.value ? +e.target.value : null; rerender(); };
+
+rerender();
+
+
+
+
+// === GitHub sync config ===
+// Token is stored in localStorage (never hard-coded in source)
+function getGHToken() { return localStorage.getItem('vehicleHunter.ghToken') || ''; }
+function setGHToken(t) { localStorage.setItem('vehicleHunter.ghToken', t.trim()); }
+const GITHUB_REPO  = 'jesseyeomans/stevesdealfinder';
+const GH_API       = 'https://api.github.com';
+
+async function ghGet(path) {
+  try {
+    const r = await fetch(`${GH_API}/repos/${GITHUB_REPO}/contents/${path}`, {
+      headers: { Authorization: `token ${getGHToken()}`, Accept: 'application/vnd.github+json' }
+    });
+    if (!r.ok) return null;
+    const d = await r.json();
+    return { content: JSON.parse(atob(d.content.replace(/[\r\n]/g, ''))), sha: d.sha };
+  } catch (_) { return null; }
+}
+
+async function ghPut(path, obj, sha) {
+  try {
+    const body = { message: `sync ${path}`, content: btoa(unescape(encodeURIComponent(JSON.stringify(obj, null, 2)))) };
+    if (sha) body.sha = sha;
+    await fetch(`${GH_API}/repos/${GITHUB_REPO}/contents/${path}`, {
+      method: 'PUT',
+      headers: { Authorization: `token ${getGHToken()}`, 'Content-Type': 'application/json', Accept: 'application/vnd.github+json' },
+      body: JSON.stringify(body)
+    });
+  } catch (_) {}
+}
+
+// === Status tracking (Bought / Passing / Calling / etc.) ===
+const STATUS_KEY = 'vehicleHunter.status.v1';
+let _statusSha = null;
+function loadLocalStatus() {
+  try { return JSON.parse(localStorage.getItem(STATUS_KEY) || '{}'); }
+  catch (_) { return {}; }
+}
+function saveLocalStatus(map) { localStorage.setItem(STATUS_KEY, JSON.stringify(map)); }
+let STATUS_MAP = loadLocalStatus();
+
+async function loadStatus() {
+  const res = await ghGet('data/status.json');
+  if (res) {
+    _statusSha = res.sha;
+    STATUS_MAP = Object.assign(loadLocalStatus(), res.content);
+    saveLocalStatus(STATUS_MAP);
+  }
+  return STATUS_MAP;
+}
+async function saveStatus(map) {
+  saveLocalStatus(map);
+  STATUS_MAP = map;
+  const fresh = await ghGet('data/status.json');
+  _statusSha = fresh ? fresh.sha : null;
+  await ghPut('data/status.json', map, _statusSha);
+}
+function getStatus(url) { return STATUS_MAP[url] || null; }
+function setStatus(url, val) {
+  const updated = Object.assign({}, STATUS_MAP, { [url]: val });
+  saveStatus(updated);
+}
+
+// === GitHub sync init (called after token confirmed) ===
+function initGHSync() {
+  if (!getGHToken()) {
+    document.getElementById('gh-token-banner').style.display = '';
+    return;
+  }
+  document.getElementById('gh-token-banner').style.display = 'none';
+  loadStatus().then(() => rerender()).catch(() => {});
+  (async () => {
+    try {
+      const res = await ghGet('data/blocklist.json');
+      if (res && Array.isArray(res.content)) {
+        _blocklistSha = res.sha;
+        res.content.forEach(k => BLOCKED.add(k));
+        saveLocalBlocked(BLOCKED);
+        rerender();
+      }
+    } catch (_) {}
+  })();
+}
+
+// === Remove / blocklist support ===
+const BLOCK_KEY = 'vehicleHunter.blocked.v1';
+let _blocklistSha = null;
+function loadLocalBlocked() {
+  try { return new Set(JSON.parse(localStorage.getItem(BLOCK_KEY) || '[]')); }
+  catch (_) { return new Set(); }
+}
+function saveLocalBlocked(set) { localStorage.setItem(BLOCK_KEY, JSON.stringify([...set])); }
+function blockKey(src, postingId) { return src + ':' + postingId; }
+let BLOCKED = loadLocalBlocked();
+
+function deriveSrcAndId(url) {
+  let src = 'craigslist';
+  if (url.includes('facebook.com')) src = 'facebook';
+  else if (url.includes('iaai.com')) src = 'iaa';
+  else if (url.includes('govdeals.com')) src = 'govdeals';
+  const segs = url.split('/').filter(Boolean);
+  const last = segs[segs.length - 1] || '';
+  const postingId = (last.replace('.html', '') || '').split('?')[0];
+  return { src, postingId };
+}
+
+function isBlocked(r) {
+  const id = r.posting_id ?? deriveSrcAndId(r.url || '').postingId;
+  return BLOCKED.has(blockKey(r.src, id)) || BLOCKED.has(r.url);
+}
+
+async function syncBlocklist() {
+  const arr = [...BLOCKED];
+  const fresh = await ghGet('data/blocklist.json');
+  _blocklistSha = fresh ? fresh.sha : null;
+  await ghPut('data/blocklist.json', arr, _blocklistSha);
+}
+
+// (blocklist hydration runs inside initGHSync)
+
+function openListing(url) {
+  if (!url) return;
+  const w = window.open(url, '_blank', 'noopener,noreferrer');
+  if (w) { try { w.focus(); } catch (_) {} }
+  else { window.location.href = url; }
+}
+
+// SINGLE delegated click handler with prioritized branches.
+// Capture phase + stopImmediatePropagation = remove button never triggers card-open.
+let _lastClickAt = 0;
+document.addEventListener('click', function(e) {
+  const removeBtn = e.target.closest('button.remove-btn');
+  if (removeBtn) {
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    e.stopPropagation();
+    const card = removeBtn.closest('.card-deal[data-url]');
+    if (!card) return;
+    const url = card.dataset.url || '';
+    const { src, postingId } = deriveSrcAndId(url);
+    BLOCKED.add(blockKey(src, postingId));
+    BLOCKED.add(url);
+    saveLocalBlocked(BLOCKED);
+    // Hide immediately then sync to GitHub in background
+    card.classList.add('removed');
+    card.style.display = 'none';
+    syncBlocklist().catch(() => {});
+    return;
+  }
+  // Otherwise: clicking the card / view button / title link opens the listing
+  const a = e.target.closest('a.view-btn, a.title-link');
+  const card = e.target.closest('.card-deal[data-url]');
+  let url = null;
+  if (a) url = a.getAttribute('href');
+  else if (card) url = card.dataset.url;
+  if (!url) return;
+  const now = Date.now();
+  if (now - _lastClickAt < 300) { e.preventDefault(); return; }
+  _lastClickAt = now;
+  e.preventDefault();
+  e.stopPropagation();
+  openListing(url);
+}, true);
+
+// === Token setup UI ===
+function ghSaveToken() {
+  const t = (document.getElementById('gh-token-input').value || '').trim();
+  if (!t) return;
+  setGHToken(t);
+  initGHSync();
+}
+
+// Kick off sync on page load
+initGHSync();
+</script>
+</body>
+</html>
