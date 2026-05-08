@@ -684,10 +684,10 @@ main {
 </style>
 </head>
 <body>
-<div id="gh-token-banner" style="display:none;position:fixed;top:0;left:0;right:0;z-index:9999;background:#1E293B;border-bottom:1px solid #334155;padding:10px 16px;font-size:13px;color:#F1F5F9;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+<div id="gh-token-banner" style="display:none;position:fixed;top:0;left:0;right:0;z-index:9999;background:#1E293B;border-bottom:1px solid #334155;padding:10px 16px;font-size:13px;color:#F1F5F9;align-items:center;gap:10px;flex-wrap:wrap">
   <span>🔑 <strong>Cloud sync off</strong> — enter your GitHub token to sync across devices</span>
-  <input type="password" id="gh-token-input" placeholder="paste token here…" style="flex:1;min-width:220px;max-width:320px;padding:5px 9px;border:1px solid #475569;border-radius:5px;background:#0F172A;color:#F1F5F9;font-size:13px">
-  <button onclick="ghSaveToken()" style="padding:5px 14px;background:#22D3EE;color:#0A0F1C;border:none;border-radius:5px;cursor:pointer;font-weight:600;font-size:13px">Save</button>
+  <input type="password" id="gh-token-input" placeholder="paste token here…" onkeydown="if(event.key==='Enter'){event.preventDefault();ghSaveToken();}" style="flex:1;min-width:220px;max-width:320px;padding:5px 9px;border:1px solid #475569;border-radius:5px;background:#0F172A;color:#F1F5F9;font-size:13px">
+  <button data-token-save="1" onclick="ghSaveToken()" style="padding:5px 14px;background:#22D3EE;color:#0A0F1C;border:none;border-radius:5px;cursor:pointer;font-weight:600;font-size:13px">Save</button>
   <a href="https://github.com/settings/tokens/new?scopes=repo&description=StevesDealFinder" target="_blank" rel="noopener" style="color:#94A3B8;font-size:11px">Get a token (repo scope)</a>
 </div>
 
@@ -980,7 +980,7 @@ async function syncBlocklist() {
 
 async function initGHSync() {
   if (!getGHToken()) {
-    document.getElementById('gh-token-banner').style.display = '';
+    document.getElementById('gh-token-banner').style.display = 'flex';
     return;
   }
   document.getElementById('gh-token-banner').style.display = 'none';
@@ -1317,8 +1317,8 @@ document.addEventListener('click', function(e) {
     else setStatus(r, next);
     return;
   }
-  // Remove-button clicks are handled by their own inline onclick — let the event through.
-  if (e.target.closest('[data-remove]')) return;
+  // Remove-button and token-save clicks are handled by inline onclick — let the event through.
+  if (e.target.closest('[data-remove],[data-token-save]')) return;
   const photo = e.target.closest('.photo[data-photos]');
   if (photo && !e.target.closest('.carousel-btn')) {
     e.preventDefault(); e.stopImmediatePropagation();
@@ -1483,3 +1483,7 @@ function carouselNav(e, dir) {
 
 populateDropdowns();
 wireFilters();
+initGHSync();
+</script>
+</body>
+</html>
