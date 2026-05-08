@@ -523,6 +523,29 @@ main {
   display: flex; gap: 8px; padding: 0 16px 14px;
   align-items: center;
 }
+
+/* Per-card value-lookup buttons (KBB / Edmunds / NADA / Carfax) */
+.value-btns {
+  display: flex; gap: 6px;
+  padding: 0 16px 8px;
+}
+.value-btns a {
+  flex: 1; text-align: center;
+  padding: 6px 6px;
+  font: 700 11px 'Inter', sans-serif;
+  letter-spacing: 0.06em; text-transform: uppercase;
+  text-decoration: none;
+  color: var(--text-muted);
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  transition: all 0.15s;
+}
+.value-btns a:hover { color: var(--text); background: var(--bg-3); transform: translateY(-1px); }
+.value-btns a.kbb:hover     { border-color: #4DA3FF; color: #93C5FD; }
+.value-btns a.edmunds:hover { border-color: #FF6B5C; color: #FCA5A5; }
+.value-btns a.nada:hover    { border-color: #5C8FCC; color: #A5B4FC; }
+.value-btns a.carfax:hover  { border-color: #C4221C; color: #FCA5A5; }
 .view-btn {
   flex: 1;
   background: var(--cyan); color: #001E25;
@@ -909,6 +932,50 @@ document.getElementById('run-date').textContent =
 function fmt$(n) { return n != null ? '$' + Math.round(n).toLocaleString() : '–'; }
 function fmtPct(p) { return p != null ? (p > 0 ? '+' : '') + p.toFixed(1) + '%' : '–'; }
 function fmtMiles(m) { return m ? m.toLocaleString() + ' mi' : ''; }
+
+// ─── Value-lookup URL builders (KBB / Edmunds / NADA / Carfax) ──────────
+// One-click jumps to public valuation pages. The user already has accounts
+// on these sites in their browser, so the page renders fully on click.
+const STEVE_ZIP = '54843';  // Hayward, WI — change here once if dealership relocates
+function _slug(s) {
+  return (s || '').toLowerCase().trim().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+}
+function _modelSlug(model) {
+  // KBB / Edmunds use lowercase hyphens. Strip trim words ("LT","XLT","ES",etc.) - we keep
+  // the model slug only and let the user pick trim on the destination page.
+  return _slug((model || '').split(/\s+/)[0]);
+}
+function _cap(s) {
+  return (s || '').split('-').map(w => w ? w[0].toUpperCase() + w.slice(1) : '').join('-');
+}
+function kbbUrl(r) {
+  const make = _slug(r.make), model = _modelSlug(r.model), year = r.year;
+  if (!make || !model || !year) return 'https://www.kbb.com/whats-my-car-worth/';
+  const q = new URLSearchParams();
+  if (r.miles) q.set('mileage', r.miles);
+  q.set('zipcode', STEVE_ZIP);
+  return `https://www.kbb.com/${make}/${model}/${year}/?${q.toString()}`;
+}
+function edmundsUrl(r) {
+  const make = _slug(r.make), model = _modelSlug(r.model), year = r.year;
+  if (!make || !model || !year) return 'https://www.edmunds.com/appraisal/';
+  return `https://www.edmunds.com/${make}/${model}/${year}/?zip=${STEVE_ZIP}${r.miles?'&mileage='+r.miles:''}`;
+}
+function nadaUrl(r) {
+  // NADA / J.D. Power Values uses PascalCase slugs in the path.
+  const make = _cap(_slug(r.make)), model = _cap(_modelSlug(r.model)), year = r.year;
+  if (!make || !model || !year) return 'https://www.nadaguides.com/Cars';
+  return `https://www.nadaguides.com/Cars/${year}/${make}/${model}`;
+}
+function carfaxUrl(r) {
+  // If we have a VIN use the VIN history page; otherwise fall back to a search.
+  if (r.vin && r.vin.length === 17) {
+    return `https://www.carfax.com/VehicleHistory/p/Report.cfx?vin=${encodeURIComponent(r.vin)}`;
+  }
+  const year = r.year;
+  if (!r.make || !r.model || !year) return 'https://www.carfax.com/';
+  return `https://www.carfax.com/Used-${_cap(_slug(r.make))}-${_cap(_modelSlug(r.model))}_w${year}`;
+}
 function escapeHtml(s) {
   return (s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
@@ -1265,6 +1332,12 @@ function renderCards(visible) {
         ${recalls}
         ${notes}
       </div>
+      <div class="value-btns">
+        <a class="kbb"     data-value-btn="1" href="${kbbUrl(r)}"     target="_blank" rel="noopener" onclick="event.stopPropagation()" title="Look up Kelley Blue Book value">KBB</a>
+        <a class="edmunds" data-value-btn="1" href="${edmundsUrl(r)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="Look up Edmunds value">Edmunds</a>
+        <a class="nada"    data-value-btn="1" href="${nadaUrl(r)}"    target="_blank" rel="noopener" onclick="event.stopPropagation()" title="Look up NADA / J.D. Power value">NADA</a>
+        <a class="carfax"  data-value-btn="1" href="${carfaxUrl(r)}"  target="_blank" rel="noopener" onclick="event.stopPropagation()" title="Look up Carfax history">Carfax</a>
+      </div>
       <div class="actions">
         <a class="${btnClass}" href="${r.url}" target="_blank" rel="noopener">${btnText}</a>
         <button class="status-pill s-${status}" data-status="1" title="Click to advance status">${statusLbl}</button>
@@ -1322,7 +1395,7 @@ document.addEventListener('click', function(e) {
     return;
   }
   // Remove-button and token-save clicks are handled by inline onclick — let the event through.
-  if (e.target.closest('[data-remove],[data-token-save]')) return;
+  if (e.target.closest('[data-remove],[data-token-save],[data-value-btn]')) return;
   const photo = e.target.closest('.photo[data-photos]');
   if (photo && !e.target.closest('.carousel-btn')) {
     e.preventDefault(); e.stopImmediatePropagation();
@@ -1401,93 +1474,4 @@ function highlightFocused() {
   document.querySelectorAll('.card.focused').forEach(c => c.classList.remove('focused'));
   if (FOCUS_IDX >= 0) {
     const c = document.querySelector('.card[data-idx="' + FOCUS_IDX + '"]');
-    if (c) { c.classList.add('focused'); c.scrollIntoView({block:'center', behavior:'smooth'}); }
-  }
-}
-document.addEventListener('keydown', (e) => {
-  if (e.target && /input|textarea|select/i.test(e.target.tagName)) {
-    if (e.key === 'Escape') e.target.blur();
-    return;
-  }
-  if (document.getElementById('lightbox').classList.contains('open')) {
-    if (e.key === 'Escape') closeLightbox();
-    if (e.key === 'ArrowLeft') nextLb(-1);
-    if (e.key === 'ArrowRight') nextLb(+1);
-    return;
-  }
-  if (helpEl.classList.contains('open') && e.key === 'Escape') { helpEl.classList.remove('open'); return; }
-  if (e.key === '?') { helpEl.classList.toggle('open'); return; }
-  if (e.key === '/') { e.preventDefault(); document.getElementById('f-search').focus(); return; }
-  if (e.key === 'j') { FOCUS_IDX = Math.min(VISIBLE.length-1, FOCUS_IDX+1); highlightFocused(); return; }
-  if (e.key === 'k') { FOCUS_IDX = Math.max(0, FOCUS_IDX-1); highlightFocused(); return; }
-  if (FOCUS_IDX < 0) return;
-  const r = VISIBLE[FOCUS_IDX];
-  if (!r) return;
-  if (e.key === 'Enter') { openListing(r.url); }
-  else if (e.key === 'p') { if (r.photos && r.photos.length) openLightbox(r.photos, 0); }
-  else if (e.key === 'c') { setStatus(r, 'calling'); }
-  else if (e.key === 'v') { setStatus(r, 'visiting'); }
-  else if (e.key === 'b') { setStatus(r, 'bought'); }
-  else if (e.key === 'x') {
-    const card = document.querySelector('.card[data-idx="' + FOCUS_IDX + '"]');
-    if (card) doRemove(card, r);
-  }
-});
-
-const IS_TOUCH = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
-const IS_MOBILE = /android|iphone|ipad|ipod|mobile|tablet/i.test(navigator.userAgent || '')
-                  || window.matchMedia('(max-width: 760px)').matches;
-if (IS_TOUCH) document.body.classList.add('touch');
-if (IS_MOBILE) document.body.classList.add('mobile');
-
-if (IS_TOUCH) {
-  let touchStartX = 0;
-  const lb = document.getElementById('lightbox');
-  lb.addEventListener('touchstart', (e) => { touchStartX = e.touches[0].clientX; }, {passive: true});
-  lb.addEventListener('touchend', (e) => {
-    const dx = (e.changedTouches[0].clientX || 0) - touchStartX;
-    if (Math.abs(dx) > 50) nextLb(dx < 0 ? +1 : -1);
-  }, {passive: true});
-}
-
-window.addEventListener('orientationchange', () => setTimeout(rerender, 100));
-window.addEventListener('resize', (() => {
-  let t; return () => { clearTimeout(t); t = setTimeout(rerender, 200); };
-})());
-
-// ── Carousel navigation ──────────────────────────────────────────────────────
-function carouselNav(e, dir) {
-  e.preventDefault(); e.stopImmediatePropagation();
-  const photoDiv = e.target.closest('.photo[data-photos]');
-  if (!photoDiv) return;
-  let arr = []; try { arr = JSON.parse(photoDiv.dataset.photos); } catch (_) {}
-  if (arr.length < 2) return;
-  let idx = ((parseInt(photoDiv.dataset.carouselIdx || '0', 10) + dir) + arr.length) % arr.length;
-  photoDiv.dataset.carouselIdx = idx;
-  const img = photoDiv.querySelector('img');
-  if (img) { img.src = arr[idx]; img.removeAttribute('onerror'); }
-  const ctr = photoDiv.querySelector('.carousel-counter');
-  if (ctr) ctr.textContent = `${idx + 1}/${arr.length}`;
-}
-
-// Touch swipe on photo cards
-(function() {
-  let tx = 0;
-  document.addEventListener('touchstart', e => {
-    const p = e.target.closest('.photo[data-photos]');
-    if (p) tx = e.touches[0].clientX;
-  }, { passive: true });
-  document.addEventListener('touchend', e => {
-    const p = e.target.closest('.photo[data-photos]');
-    if (!p) return;
-    const dx = e.changedTouches[0].clientX - tx;
-    if (Math.abs(dx) > 40) carouselNav({ preventDefault(){}, stopImmediatePropagation(){}, target: p.querySelector('img') || p }, dx < 0 ? 1 : -1);
-  }, { passive: true });
-})();
-
-populateDropdowns();
-wireFilters();
-initGHSync();
-</script>
-</body>
-</html>
+    if (c) { c.classList.add('focused'); c.scrollIntoView({block:'center', behavior:'s
