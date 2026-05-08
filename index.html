@@ -707,12 +707,7 @@ main {
 </style>
 </head>
 <body>
-<div id="gh-token-banner" style="display:none;position:fixed;top:0;left:0;right:0;z-index:9999;background:#1E293B;border-bottom:1px solid #334155;padding:10px 16px;font-size:13px;color:#F1F5F9;align-items:center;gap:10px;flex-wrap:wrap">
-  <span>🔑 <strong>Cloud sync off</strong> — enter your GitHub token to sync across devices</span>
-  <input type="password" id="gh-token-input" placeholder="paste token here…" onkeydown="if(event.key==='Enter'){event.preventDefault();ghSaveToken();}" style="flex:1;min-width:220px;max-width:320px;padding:5px 9px;border:1px solid #475569;border-radius:5px;background:#0F172A;color:#F1F5F9;font-size:13px">
-  <button data-token-save="1" onclick="ghSaveToken()" style="padding:5px 14px;background:#22D3EE;color:#0A0F1C;border:none;border-radius:5px;cursor:pointer;font-weight:600;font-size:13px">Save</button>
-  <a href="https://github.com/settings/tokens/new?scopes=repo&description=StevesDealFinder" target="_blank" rel="noopener" style="color:#94A3B8;font-size:11px">Get a token (repo scope)</a>
-</div>
+<!-- token banner removed: auth handled server-side by Cloudflare Worker -->
 
 
 <div class="topbar">
@@ -1003,14 +998,14 @@ const filter = {
 
 // ─── GitHub sync config ────────────────────────────────────────────────────
 const GITHUB_REPO = 'JesseYeomans/StevesDealFinder';
-const GH_API      = 'https://api.github.com';
+const GH_API      = 'https://stevesdealfinder-api.jesseyeomans.workers.dev';
 function getGHToken() { return localStorage.getItem('steve.ghToken') || ''; }
 function setGHToken(t) { localStorage.setItem('steve.ghToken', t.trim()); }
 
 async function ghGet(path) {
   try {
     const r = await fetch(`${GH_API}/repos/${GITHUB_REPO}/contents/${path}`, {
-      headers: { Authorization: `token ${getGHToken()}`, Accept: 'application/vnd.github+json' }
+      headers: { Accept: 'application/vnd.github+json' }
     });
     if (!r.ok) return null;
     const d = await r.json();
@@ -1023,7 +1018,7 @@ async function ghPut(path, obj, sha) {
     if (sha) body.sha = sha;
     await fetch(`${GH_API}/repos/${GITHUB_REPO}/contents/${path}`, {
       method: 'PUT',
-      headers: { Authorization: `token ${getGHToken()}`, 'Content-Type': 'application/json', Accept: 'application/vnd.github+json' },
+      headers: { 'Content-Type': 'application/json', Accept: 'application/vnd.github+json' },
       body: JSON.stringify(body)
     });
   } catch (_) {}
@@ -1032,14 +1027,14 @@ async function ghPut(path, obj, sha) {
 let _statusSha = null, _blocklistSha = null;
 
 async function syncStatus() {
-  if (!getGHToken()) return;
+  // Auth happens at the Worker — always sync, no token check needed.
   const arr = [...STATUS];  // array of [key, value] pairs
   const fresh = await ghGet('data/status.json');
   _statusSha = fresh ? fresh.sha : null;
   await ghPut('data/status.json', arr, _statusSha);
 }
 async function syncBlocklist() {
-  if (!getGHToken()) return;
+  // Auth happens at the Worker — always sync, no token check needed.
   const arr = [...BLOCKED];
   const fresh = await ghGet('data/blocklist.json');
   _blocklistSha = fresh ? fresh.sha : null;
@@ -1047,16 +1042,21 @@ async function syncBlocklist() {
 }
 
 async function initGHSync() {
-  if (!getGHToken()) {
-    document.getElementById('gh-token-banner').style.display = 'flex';
-    return;
-  }
-  document.getElementById('gh-token-banner').style.display = 'none';
+  // No token banner — the Cloudflare Worker holds the GitHub PAT server-side.
+  // Anyone visiting the page just sees the data.
   try {
     const res = await ghGet('data/blocklist.json');
     if (res && Array.isArray(res.content)) {
       _blocklistSha = res.sha;
-      res.content.forEach(k => BLOCKED.add(k));
+      res.content.forEach(entry => {
+        // The blocklist file mixes shapes (objects with source+posting_id, plain
+        // key strings, full URLs). Normalize all of them into the BLOCKED Set.
+        if (typeof entry === 'string') {
+          BLOCKED.add(entry);
+        } else if (entry && entry.source != null && entry.posting_id != null) {
+          BLOCKED.add(blockKey(entry.source, entry.posting_id));
+        }
+      });
       saveLocalBlocked(BLOCKED);
     }
   } catch (_) {}
@@ -1064,17 +1064,20 @@ async function initGHSync() {
     const res = await ghGet('data/status.json');
     if (res && Array.isArray(res.content)) {
       _statusSha = res.sha;
-      res.content.forEach(([k, v]) => STATUS.set(k, v));
+      res.content.forEach(item => {
+        if (Array.isArray(item) && item.length === 2) {
+          STATUS.set(item[0], item[1]);
+        } else if (item && item.source != null && item.posting_id != null && item.status) {
+          STATUS.set(blockKey(item.source, item.posting_id), item.status);
+        }
+      });
       saveStatus(STATUS);
     }
   } catch (_) {}
   rerender();
 }
 function ghSaveToken() {
-  const t = (document.getElementById('gh-token-input').value || '').trim();
-  if (!t) return;
-  setGHToken(t);
-  initGHSync();
+  // No-op: token banner removed, auth lives in Cloudflare Worker now.
 }
 
 // ─── Status persistence (Calling / Visiting / Bought) ──────────────────
